@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สมุดพกอัจฉริยะ - Educational Analytics Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        },
+                        cluster0: {
+                            light: '#10b981',
+                            DEFAULT: '#059669',
+                            dark: '#047857',
+                            bg: 'rgba(16, 185, 129, 0.15)'
+                        },
+                        cluster1: {
+                            light: '#3b82f6',
+                            DEFAULT: '#2563eb',
+                            dark: '#1d4ed8',
+                            bg: 'rgba(59, 130, 246, 0.15)'
+                        },
+                        cluster2: {
+                            light: '#f43f5e',
+                            DEFAULT: '#e11d48',
+                            dark: '#be123c',
+                            bg: 'rgba(244, 63, 94, 0.15)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Prompt', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Prompt', 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* SVG Point animations & glow */
+        .dot-point {
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), r 0.25s ease, fill 0.3s, opacity 0.3s;
+            cursor: pointer;
+        }
+        .dot-point:hover {
+            r: 9px;
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+
+        .centroid-marker {
+            transition: transform 0.4s ease, fill 0.3s;
+            cursor: pointer;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.25); opacity: 0.3; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .pulse-halo {
+            transform-origin: center;
+            animation: pulse-ring 2.5s infinite ease-in-out;
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col antialiased">
+
+    <!-- Top Header Navigation -->
+    <header class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-sky-600 via-indigo-500 to-purple-600 bg-clip-text text-transparent">
+                        สมุดพกอัจฉริยะ
+                    </h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Educational Analytics & K-Means Behavior System</p>
+                </div>
+            </div>
+
+            <!-- Right side action toolbar -->
+            <div class="flex items-center gap-3">
+                <!-- Search Student Input -->
+                <div class="relative hidden md:block w-64">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="studentSearchInput" onkeyup="filterStudentsByName()" placeholder="ค้นหาชื่อผู้เรียน..." 
+                        class="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white transition">
+                </div>
+
+                <!-- Dark / Light Theme Toggle -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" aria-label="Toggle Theme" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                    <i class="fa-solid fa-moon text-base dark:hidden"></i>
+                    <i class="fa-solid fa-sun text-base hidden dark:block text-amber-400"></i>
+                </button>
+
+                <!-- Export Data Button -->
+                <button onclick="exportData()" class="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                    <i class="fa-solid fa-download"></i>
+                    <span>ส่งออกข้อมูล</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Top Overview Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">ผู้เรียนทั้งหมด</p>
+                    <h3 class="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100" id="statTotalStudents">36</h3>
+                    <p class="text-xs text-emerald-500 font-medium mt-1"><i class="fa-solid fa-check-circle mr-1"></i>ครบ 100% รายชื่อ</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">คะแนนเฉลี่ยห้อง</p>
+                    <h3 class="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100" id="statAvgScore">74.8%</h3>
+                    <p class="text-xs text-sky-500 font-medium mt-1"><i class="fa-solid fa-chart-simple mr-1"></i><span id="statAvgGPA">GPA เฉลี่ย --</span></p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">อัตราเข้าเรียนเฉลี่ย</p>
+                    <h3 class="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100" id="statAvgAttendance">88.5%</h3>
+                    <p class="text-xs text-emerald-500 font-medium mt-1"><i class="fa-solid fa-user-check mr-1"></i>อยู่ในเกณฑ์ดี</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-calendar-check"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">กลุ่มเฝ้าระวัง (At-Risk)</p>
+                    <h3 class="text-2xl font-bold mt-1 text-rose-600 dark:text-rose-400" id="statAtRiskCount">7 คน</h3>
+                    <p class="text-xs text-rose-500 font-medium mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ต้องดูแลใกล้ชิด</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Primary K-Means Scatter Plot Container -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm space-y-4">
+            
+            <!-- Scatter Controls & Header -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-sm">
+                            <i class="fa-solid fa-diagram-project"></i>
+                        </span>
+                        <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">
+                            การจัดกลุ่มพฤติกรรมผู้เรียน (K-Means Scatter Plot)
+                        </h2>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        แผนภูมิแบบจุดโต้ตอบได้ แสดงการกระจายตัวของนักเรียน 3 กลุ่มตามผลการเรียนและพฤติกรรม
+                    </p>
+                </div>
+
+                <!-- Y-Axis Metric Selector Control -->
+                <div class="flex items-center gap-3 self-start md:self-auto bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl border border-slate-200 dark:border-slate-600">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300 pl-2">แกน Y:</span>
+                    <button id="yAxisBtnAttendance" onclick="setYAxisMetric('attendance')" 
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-600">
+                        <i class="fa-solid fa-user-clock mr-1"></i> คะแนนเข้าเรียน (%)
+                    </button>
+                    <button id="yAxisBtnAssignments" onclick="setYAxisMetric('assignments')" 
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
+                        <i class="fa-solid fa-file-signature mr-1"></i> อัตราการส่งงาน (%)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Legend Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-3 text-xs px-1 py-1">
+                <div class="flex flex-wrap items-center gap-4">
+                    <!-- Cluster 0 Legend -->
+                    <div class="flex items-center gap-2 cursor-pointer opacity-100 hover:opacity-80 transition" onclick="highlightCluster(0)">
+                        <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm inline-block"></span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">กลุ่ม 1: เรียนดี-มีวินัยสูง</span>
+                    </div>
+                    <!-- Cluster 1 Legend -->
+                    <div class="flex items-center gap-2 cursor-pointer opacity-100 hover:opacity-80 transition" onclick="highlightCluster(1)">
+                        <span class="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm inline-block"></span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">กลุ่ม 2: ปานกลาง-พยายามดี</span>
+                    </div>
+                    <!-- Cluster 2 Legend -->
+                    <div class="flex items-center gap-2 cursor-pointer opacity-100 hover:opacity-80 transition" onclick="highlightCluster(2)">
+                        <span class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-sm inline-block"></span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">กลุ่ม 3: เสี่ยง-ต้องช่วยเหลือ</span>
+                    </div>
+                    <!-- Centroid Legend -->
+                    <div class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+                        <span class="text-amber-500 font-bold text-sm"><i class="fa-solid fa-star"></i></span>
+                        <span class="font-medium text-slate-600 dark:text-slate-400">จุดศูนย์กลางกลุ่ม (Centroid)</span>
+                    </div>
+                </div>
+
+                <button onclick="resetPlotHighlight()" class="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> แสดงทั้งหมด
+                </button>
+            </div>
+
+            <!-- SVG Scatter Plot Canvas Container -->
+            <div class="relative w-full overflow-hidden bg-slate-50/70 dark:bg-slate-900/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-2 sm:p-4">
+                
+                <!-- Floating Dynamic SVG Canvas -->
+                <svg id="scatterSvg" class="w-full h-[380px] sm:h-[440px] select-none" viewBox="0 0 800 480" preserveAspectRatio="xMidYMid meet">
+                    <!-- SVG elements generated dynamically via JavaScript -->
+                </svg>
+
+                <!-- Floating Tooltip Container -->
+                <div id="scatterTooltip" class="absolute hidden pointer-events-none z-20 bg-slate-900/95 text-white dark:bg-slate-800/95 dark:text-slate-100 p-3 rounded-xl shadow-xl border border-slate-700 backdrop-blur-md text-xs w-60 transition-opacity duration-150 transform -translate-x-1/2 -translate-y-full mb-3">
+                    <!-- Tooltip content rendered dynamically -->
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-400 dark:text-slate-500 text-center italic">
+                <i class="fa-solid fa-circle-info mr-1"></i> คำแนะนำ: นำเมาส์ไปชี้ที่จุดเพื่อดูข้อมูลนักเรียน หรือ คลิกที่จุดเพื่อเปิดดูสมุดพกรายงานส่วนบุคคล
+            </p>
+        </div>
+
+        <!-- Cluster Breakdown Summary Cards -->
+        <div class="space-y-3">
+            <h3 class="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-cubes text-sky-500"></i>
+                <span>สรุปจำแนกพฤติกรรมและรายชื่อนักเรียนรายกลุ่ม</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5" id="clusterCardsContainer">
+                <!-- Cluster Cards rendered by JS -->
+            </div>
+        </div>
+
+        <!-- Predictive Risk Ranking Table -->
+        <div class="space-y-3">
+            <h3 class="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-rose-500"></i>
+                <span>การคาดการณ์แนวโน้มผลการเรียนรายบุคคล (Predictive Risk Ranking)</span>
+            </h3>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm">
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    เรียงลำดับจากความเสี่ยงไม่ผ่านเกณฑ์ (คาดการณ์) สูงสุดไปต่ำสุด — คลิกที่แถวเพื่อดูสมุดพกรายบุคคล
+                </p>
+                <div class="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border border-slate-100 dark:border-slate-700/60">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead class="sticky top-0 bg-slate-50 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 z-10">
+                            <tr>
+                                <th class="px-3 py-2 font-semibold">ชื่อ-นามสกุล</th>
+                                <th class="px-3 py-2 font-semibold text-center">คะแนนปัจจุบัน</th>
+                                <th class="px-3 py-2 font-semibold text-center">เกรดปัจจุบัน</th>
+                                <th class="px-3 py-2 font-semibold text-center">คะแนนคาดการณ์*</th>
+                                <th class="px-3 py-2 font-semibold text-center">เกรดคาดการณ์*</th>
+                                <th class="px-3 py-2 font-semibold text-center">ความเสี่ยงไม่ผ่าน</th>
+                                <th class="px-3 py-2 font-semibold text-center">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="predictionTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                            <!-- Rendered by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 italic mt-3">
+                    * คะแนนคาดการณ์ประมาณจากคะแนนปัจจุบันบวกคะแนนที่มีโอกาสได้คืนหากส่งงานค้างครบ (คิด 70% ของน้ำหนักหัวข้อนั้นๆ) ส่วนความเสี่ยงไม่ผ่านเกณฑ์คำนวณจากแบบจำลองสถิติอย่างง่าย (ไม่ใช่ Machine Learning ที่ฝึกฝนจากข้อมูลย้อนหลังจริง) จึงควรใช้เป็นข้อมูลประกอบการดูแลนักเรียนเบื้องต้นเท่านั้น
+                </p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Individual Student Profile Modal -->
+    <div id="studentModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-xl w-full border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden transform transition-all duration-200 scale-95 opacity-0" id="modalCard">
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-slate-100 dark:border-slate-700/70 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50" id="modalHeaderBg">
+                <div class="flex items-center gap-4">
+                    <div id="modalStudentAvatar" class="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">
+                        --
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 id="modalStudentName" class="text-lg font-bold text-slate-800 dark:text-white">ชื่อ นักเรียน</h3>
+                            <span id="modalStudentClusterBadge" class="text-xs px-2.5 py-0.5 rounded-full font-semibold">กลุ่ม --</span>
+                        </div>
+                        <p id="modalStudentID" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">รหัสนักเรียน: STU-XXXX</p>
+                    </div>
+                </div>
+                <button onclick="closeStudentModal()" class="w-8 h-8 rounded-lg bg-slate-200/60 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body Stats -->
+            <div class="p-6 space-y-5">
+                <!-- Performance Metrics Grid -->
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">คะแนนรวม (%)</p>
+                        <p id="modalTotalScore" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">0%</p>
+                        <span id="modalGradeBadge" class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white">--</span>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">การเข้าเรียน</p>
+                        <p id="modalAttendance" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">0%</p>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">การส่งงาน</p>
+                        <p id="modalAssignments" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">0%</p>
+                    </div>
+                </div>
+
+                <!-- Missing Work Alert -->
+                <div id="modalMissingBox" class="p-3.5 rounded-xl border flex items-center justify-between text-xs font-medium">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-500 text-sm"></i>
+                        <span id="modalMissingText">งานค้างชำระ / ขาดส่ง: 0 ชิ้น</span>
+                    </span>
+                    <span id="modalMissingStatus" class="font-bold">--</span>
+                </div>
+
+                <!-- Prediction Block -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-line text-sky-500"></i> การคาดการณ์แนวโน้มผลการเรียน
+                    </h4>
+                    <div class="grid grid-cols-2 gap-3 text-center">
+                        <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">คะแนนคาดการณ์ (หากส่งงานค้างครบ)</p>
+                            <p id="modalPredictedScore" class="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1">0%</p>
+                            <span id="modalPredictedGradeBadge" class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white">--</span>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">ความเสี่ยงไม่ผ่านเกณฑ์ (คาดการณ์)</p>
+                            <p id="modalRiskProbability" class="text-xl font-bold mt-1">0%</p>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 italic leading-relaxed">
+                        * เป็นการประมาณค่าเชิงสถิติอย่างง่ายจากคะแนนปัจจุบัน อัตราการเข้าเรียน และอัตราการส่งงาน เพื่อใช้ประกอบการดูแลนักเรียนเบื้องต้นเท่านั้น ไม่ใช่แบบจำลอง Machine Learning ที่ผ่านการฝึกฝนจากข้อมูลย้อนหลังจริง
+                    </p>
+                </div>
+
+                <!-- Teacher Recommendations -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i> ข้อเสนอแนะเชิงพฤติกรรมและการดูแล
+                    </h4>
+                    <p id="modalRecommendation" class="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/30 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 leading-relaxed">
+                        --
+                    </p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+                <button onclick="closeStudentModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition">
+                    ปิด
+                </button>
+                <button onclick="alertAction('พิมพ์ใบบันทึกรายงานส่วนตัวเรียบร้อยแล้ว')" class="px-4 py-2 text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i> พิมพ์ใบบันทึก
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-medium items-center gap-2 border border-slate-700 transition">
+        <i class="fa-solid fa-circle-check text-emerald-400 dark:text-emerald-600 text-base"></i>
+        <span id="toastMsg">ข้อความแจ้งเตือน</span>
+    </div>
+
+    <script>
+        // Data Set: 29 Students - รายวิชา Educational Technology and Gamification (ภาคเรียนที่ 1/2569)
+        // score = คะแนนรวม 9 หัวข้อ (เต็ม 100) | attendance = %การเข้าเรียน | submission = %ชิ้นงานปฏิบัติที่ส่ง (จาก 7 ชิ้น) | missing = จำนวนชิ้นงานที่ขาดส่ง
+        const rawStudentsData = [
+            { id: "683450038-1", name: "นางสาวชาลิสา สุโคตร", score: 51.20, attendance: 10, submission: 71, missing: 2 },
+            { id: "683450039-9", name: "นางสาวณัฐกมล วรดี", score: 48.28, attendance: 10, submission: 71, missing: 2 },
+            { id: "683450040-4", name: "นางสาวณัฐณิชา ชัยจิต", score: 66.28, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450041-2", name: "นางสาวณัฐวดี แสงมูล", score: 73.50, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450042-0", name: "นายปภังกร แก้วจันทร์", score: 71.38, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450043-8", name: "นายปุระเชษฐ จำปาบุรี", score: 71.20, attendance: 30, submission: 100, missing: 0 },
+            { id: "683450044-6", name: "นางสาวพาณิภัค พระเห็นศรี", score: 61.80, attendance: 20, submission: 86, missing: 1 },
+            { id: "683450045-4", name: "นายภานุวัฒน์ พันธ์ทอง", score: 71.28, attendance: 10, submission: 100, missing: 0 },
+            { id: "683450046-2", name: "นางสาวภูวศา เกษมสุวรรณ", score: 72.00, attendance: 20, submission: 100, missing: 0 },
+            { id: "683450047-0", name: "นายรัชชานนท์ เสนา", score: 53.90, attendance: 30, submission: 71, missing: 2 },
+            { id: "683450048-8", name: "นางสาวศศิปรียา คตภูธร", score: 41.90, attendance: 20, submission: 71, missing: 2 },
+            { id: "683450050-1", name: "นางสาวอัญธิชา แสงสุริยะ", score: 71.90, attendance: 20, submission: 100, missing: 0 },
+            { id: "683450173-5", name: "นางสาวกุลนันทน์ ลมอ่อน", score: 58.70, attendance: 15, submission: 86, missing: 1 },
+            { id: "683450174-3", name: "นางสาวจิราพัชร บุตรพะวงค์", score: 46.30, attendance: 25, submission: 71, missing: 2 },
+            { id: "683450175-1", name: "นางสาวทักษพร เที่ยงนา", score: 60.28, attendance: 25, submission: 86, missing: 1 },
+            { id: "683450176-9", name: "นายทักษิณ รัตนวัน", score: 73.58, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450177-7", name: "นางสาวธิติยา วงถวิล", score: 27.60, attendance: 0, submission: 43, missing: 4 },
+            { id: "683450178-5", name: "นายพงษ์ศิริ จันทร์กอง", score: 56.75, attendance: 25, submission: 86, missing: 1 },
+            { id: "683450179-3", name: "นางสาวพิณรฎา เขตจัตุรัส", score: 61.30, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450180-8", name: "นายวชิรวิทย์ ฉลูทอง", score: 72.00, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450181-6", name: "นางสาวศิริโสภา สร้างโสภา", score: 59.80, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450182-4", name: "นางสาวสินนภา คุณเคน", score: 52.30, attendance: 20, submission: 86, missing: 1 },
+            { id: "683450343-6", name: "นางสาวกัญญาณัฐ วรรณวิเศษ", score: 75.80, attendance: 30, submission: 100, missing: 0 },
+            { id: "683450344-4", name: "นางสาวขวัญชนก คำสุนันท์", score: 62.78, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450345-2", name: "นางสาวชนมน สุพรรณ", score: 58.80, attendance: 20, submission: 86, missing: 1 },
+            { id: "683450346-0", name: "นายธนวัฒน์ ประกอบการ", score: 58.10, attendance: 30, submission: 71, missing: 2 },
+            { id: "683450347-8", name: "นางสาวบุญญธิดา ธรรมบุตร", score: 63.80, attendance: 15, submission: 86, missing: 1 },
+            { id: "683450348-6", name: "นายพสิษฐ์ ฤทธิเลิศวิริยะ", score: 53.48, attendance: 15, submission: 86, missing: 1 },
+            { id: "683450349-4", name: "นางสาวพิมพ์ชนก เสมอไว", score: 49.30, attendance: 30, submission: 71, missing: 2 }
+        ];
+
+        // Global State Configuration
+        let currentYMetric = 'attendance'; // 'attendance' or 'assignments'
+        let currentHighlightCluster = null; // null or 0, 1, 2
+        let processedStudents = [];
+        let clusterCentroids = [];
+
+        // Cluster Definitions & Meta
+        const clusterMeta = {
+            0: {
+                name: "กลุ่มที่ 1: เรียนดี-มีวินัยสูง (High Achievers)",
+                shortName: "กลุ่มเรียนดี-มีวินัยสูง",
+                color: "#10b981",
+                darkColor: "#059669",
+                bgBadge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-300",
+                badgeBorder: "border-emerald-500",
+                icon: "fa-award",
+                desc: "นักเรียนมีความรับผิดชอบสูง ส่งงานตรงเวลา ผลการเรียนและอัตราการเข้าเรียนสม่ำเสมอในระดับยอดเยี่ยม",
+                advice: "ส่งเสริมกิจกรรมท้าทายความสามารถ (Enrichment) มอบหมายบทบาทผู้นำกลุ่ม หรือส่งเสริมการแข่งขันทางวิชาการ"
+            },
+            1: {
+                name: "กลุ่มที่ 2: ปานกลาง-พยายามดี (Moderate Effort)",
+                shortName: "กลุ่มปานกลาง-พยายามดี",
+                color: "#3b82f6",
+                darkColor: "#2563eb",
+                bgBadge: "bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-300",
+                badgeBorder: "border-blue-500",
+                icon: "fa-user-check",
+                desc: "ผลการเรียนและการเข้าเรียนอยู่ในเกณฑ์มาตรฐาน มีความตั้งใจเรียนแต่อาจยังมีชิ้นงานตกค้างเล็กน้อย",
+                advice: "ให้คำแนะนำรายบุคคลในจุดที่ยังไม่เข้าใจ เพิ่มแรงจูงใจในการส่งงานให้ตรงเวลา และกระตุ้นการมีส่วนร่วมในชั้นเรียน"
+            },
+            2: {
+                name: "กลุ่มที่ 3: เสี่ยง-ต้องช่วยเหลือ (At-Risk / Needs Support)",
+                shortName: "กลุ่มเสี่ยง-ต้องช่วยเหลือ",
+                color: "#f43f5e",
+                darkColor: "#e11d48",
+                bgBadge: "bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border-rose-300",
+                badgeBorder: "border-rose-500",
+                icon: "fa-triangle-exclamation",
+                desc: "มีอัตราขาดเรียนหรือส่งงานล่าช้าสูง ผลการเรียนอยู่ในเกณฑ์เฝ้าระวัง มีงานตกค้างหลายชิ้น",
+                advice: "จัดทำแผนช่วยเหลือเร่งด่วน (Intervention) นัดหมายพูดคุยกับผู้ปกครอง และจัดระบบเพื่อนช่วยเพื่อน (Peer Tutoring)"
+            }
+        };
+
+        /**
+         * Simple statistical prediction model (heuristic, not a trained ML model)
+         * - predictedScore: current score + realistic recoverable credit from missing assignments
+         * - riskProbability: logistic-style estimate of the chance a student ends up below the pass threshold,
+         *   driven by current score, attendance rate, and submission rate (all centered at 50)
+         */
+        const PASS_THRESHOLD = 50; // เกณฑ์ผ่านที่ใช้อ้างอิงในการประมาณความเสี่ยง (สมมติฐาน)
+
+        /**
+         * Convert a 0-100 score into a Thai 8-level letter grade (สเกลมาตรฐานที่ใช้ทั่วไปในระดับอุดมศึกษาไทย)
+         * ปรับเกณฑ์ตัวเลขในฟังก์ชันนี้ได้ตามระเบียบการวัดผลของแต่ละสถาบัน
+         */
+        function getGrade(score) {
+            if (score >= 80) return { letter: "A",  gpa: 4.0, color: "#059669" };
+            if (score >= 75) return { letter: "B+", gpa: 3.5, color: "#10b981" };
+            if (score >= 70) return { letter: "B",  gpa: 3.0, color: "#3b82f6" };
+            if (score >= 65) return { letter: "C+", gpa: 2.5, color: "#2563eb" };
+            if (score >= 60) return { letter: "C",  gpa: 2.0, color: "#f59e0b" };
+            if (score >= 55) return { letter: "D+", gpa: 1.5, color: "#f97316" };
+            if (score >= 50) return { letter: "D",  gpa: 1.0, color: "#ea580c" };
+            return { letter: "F", gpa: 0.0, color: "#e11d48" };
+        }
+
+        function computePrediction(student) {
+            const avgCategoryWeight = 100 / 9; // 9 หัวข้อคะแนนหลัก
+            const recoverable = Math.round(student.missing * avgCategoryWeight * 0.7 * 10) / 10;
+            const predictedScore = Math.min(100, Math.round((student.score + recoverable) * 10) / 10);
+
+            const z = -0.09 * (student.score - PASS_THRESHOLD)
+                      - 0.05 * (student.attendance - PASS_THRESHOLD)
+                      - 0.04 * (student.submission - PASS_THRESHOLD);
+            const riskProbability = Math.round((1 / (1 + Math.exp(-z))) * 1000) / 10; // %
+
+            let riskLabel, riskColor;
+            if (riskProbability >= 60) { riskLabel = "เสี่ยงสูง"; riskColor = "#e11d48"; }
+            else if (riskProbability >= 30) { riskLabel = "เฝ้าระวัง"; riskColor = "#2563eb"; }
+            else { riskLabel = "ความเสี่ยงต่ำ"; riskColor = "#059669"; }
+
+            return { predictedScore, recoverable, riskProbability, riskLabel, riskColor };
+        }
+
+        /**
+         * Perform K-Means Algorithm for K=3 on normalized X (Score) and Y (Selected Metric)
+         */
+        function runKMeansClustering() {
+            const K = 3;
+            // Map student data points
+            let data = rawStudentsData.map(s => {
+                let yVal = currentYMetric === 'attendance' ? s.attendance : s.submission;
+                return {
+                    student: s,
+                    x: s.score,
+                    y: yVal,
+                    // Normalized values between 0 and 1 for unbiased distance calculation
+                    normX: (s.score - 20) / 80,
+                    normY: (yVal - 0) / 100
+                };
+            });
+
+            // Seed initial centroids based on expected standard behavioral clusters
+            let centroids = [
+                { normX: 0.70, normY: 0.75 }, // Cluster 0: High
+                { normX: 0.45, normY: 0.40 }, // Cluster 1: Mid
+                { normX: 0.15, normY: 0.10 }  // Cluster 2: Risk
+            ];
+
+            let iterations = 0;
+            let maxIterations = 20;
+            let assignments = new Array(data.length).fill(0);
+
+            while (iterations < maxIterations) {
+                let changed = false;
+
+                // Step 1: Assign each point to nearest centroid
+                data.forEach((p, idx) => {
+                    let minDist = Infinity;
+                    let bestCluster = 0;
+
+                    centroids.forEach((c, cIdx) => {
+                        let dx = p.normX - c.normX;
+                        let dy = p.normY - c.normY;
+                        let dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestCluster = cIdx;
+                        }
+                    });
+
+                    if (assignments[idx] !== bestCluster) {
+                        assignments[idx] = bestCluster;
+                        changed = true;
+                    }
+                });
+
+                if (!changed) break;
+
+                // Step 2: Recalculate centroids
+                for (let cIdx = 0; cIdx < K; cIdx++) {
+                    let pts = data.filter((_, idx) => assignments[idx] === cIdx);
+                    if (pts.length > 0) {
+                        let sumX = pts.reduce((acc, p) => acc + p.normX, 0);
+                        let sumY = pts.reduce((acc, p) => acc + p.normY, 0);
+                        centroids[cIdx].normX = sumX / pts.length;
+                        centroids[cIdx].normY = sumY / pts.length;
+                    }
+                }
+
+                iterations++;
+            }
+
+            // Assign computed clusters and calculate actual coordinate centroids
+            processedStudents = data.map((d, i) => {
+                const pred = computePrediction(d.student);
+                const currentGrade = getGrade(d.student.score);
+                const predictedGrade = getGrade(pred.predictedScore);
+                return {
+                    ...d.student,
+                    xVal: d.x,
+                    yVal: d.y,
+                    cluster: assignments[i],
+                    predictedScore: pred.predictedScore,
+                    recoverable: pred.recoverable,
+                    riskProbability: pred.riskProbability,
+                    riskLabel: pred.riskLabel,
+                    riskColor: pred.riskColor,
+                    currentGrade: currentGrade,
+                    predictedGrade: predictedGrade
+                };
+            });
+
+            // Convert normalized centroids back to score/metric space
+            clusterCentroids = centroids.map((c, i) => {
+                return {
+                    cluster: i,
+                    x: Math.round((c.normX * 80 + 20) * 10) / 10,
+                    y: Math.round((c.normY * 100 + 0) * 10) / 10
+                };
+            });
+        }
+
+        /**
+         * Render the predictive risk ranking table, sorted by highest predicted risk first
+         */
+        function renderPredictionTable() {
+            const tbody = document.getElementById("predictionTableBody");
+            if (!tbody) return;
+
+            const sorted = [...processedStudents].sort((a, b) => b.riskProbability - a.riskProbability);
+
+            tbody.innerHTML = sorted.map(s => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40 cursor-pointer transition" onclick="openStudentModalById('${s.id}')">
+                    <td class="px-3 py-2 font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">${s.name}</td>
+                    <td class="px-3 py-2 text-center text-slate-600 dark:text-slate-300">${s.score.toFixed(2)}%</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style="background-color: ${s.currentGrade.color}">${s.currentGrade.letter}</span>
+                    </td>
+                    <td class="px-3 py-2 text-center text-sky-600 dark:text-sky-400 font-medium">${s.predictedScore}%</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style="background-color: ${s.predictedGrade.color}">${s.predictedGrade.letter}</span>
+                    </td>
+                    <td class="px-3 py-2 text-center font-semibold" style="color: ${s.riskColor}">${s.riskProbability}%</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style="background-color: ${s.riskColor}">${s.riskLabel}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Recompute and refresh the top overview stat cards from the live data set
+         */
+        function updateStatCards() {
+            const total = rawStudentsData.length;
+            const avgScore = rawStudentsData.reduce((sum, s) => sum + s.score, 0) / total;
+            const avgAttendance = rawStudentsData.reduce((sum, s) => sum + s.attendance, 0) / total;
+            const avgGPA = rawStudentsData.reduce((sum, s) => sum + getGrade(s.score).gpa, 0) / total;
+
+            document.getElementById("statTotalStudents").innerText = total;
+            document.getElementById("statAvgScore").innerText = avgScore.toFixed(2) + "%";
+            document.getElementById("statAvgGPA").innerText = `GPA เฉลี่ย ${avgGPA.toFixed(2)}`;
+            document.getElementById("statAvgAttendance").innerText = avgAttendance.toFixed(1) + "%";
+
+            // At-risk = students grouped into the lowest-performing cluster (Cluster 2 by meta convention)
+            const atRiskCount = processedStudents.filter(s => s.cluster === 2).length;
+            document.getElementById("statAtRiskCount").innerText = atRiskCount + " คน";
+        }
+
+        /**
+         * Render SVG Scatter Plot canvas dynamically
+         */
+        function renderScatterPlot() {
+            const svg = document.getElementById('scatterSvg');
+            svg.innerHTML = ''; // Clear existing SVG contents
+
+            const width = 800;
+            const height = 480;
+            const padding = { top: 40, right: 40, bottom: 65, left: 65 };
+            const plotW = width - padding.left - padding.right;
+            const plotH = height - padding.top - padding.bottom;
+
+            // Coordinate limits
+            const xMin = 20, xMax = 100;
+            const yMin = 0, yMax = 100;
+
+            // Helper mapping functions
+            const getXPixel = (val) => padding.left + ((val - xMin) / (xMax - xMin)) * plotW;
+            const getYPixel = (val) => padding.top + plotH - ((val - yMin) / (yMax - yMin)) * plotH;
+
+            // SVG Namespace
+            const svgNS = "http://www.w3.org/2000/svg";
+
+            // 1. Draw Background Grid Lines & Ticks
+            const gridGroup = document.createElementNS(svgNS, "g");
+            gridGroup.setAttribute("class", "grid-lines");
+
+            // Vertical Gridlines (X Axis: Score)
+            for (let x = 20; x <= 100; x += 10) {
+                let px = getXPixel(x);
+                // Line
+                let line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", px);
+                line.setAttribute("y1", padding.top);
+                line.setAttribute("x2", px);
+                line.setAttribute("y2", padding.top + plotH);
+                line.setAttribute("stroke", "currentColor");
+                line.setAttribute("class", "text-slate-200 dark:text-slate-800");
+                line.setAttribute("stroke-dasharray", "3 3");
+                gridGroup.appendChild(line);
+
+                // Label
+                let text = document.createElementNS(svgNS, "text");
+                text.setAttribute("x", px);
+                text.setAttribute("y", padding.top + plotH + 20);
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("class", "text-[11px] fill-slate-400 dark:fill-slate-500 font-medium");
+                text.textContent = x + "%";
+                gridGroup.appendChild(text);
+            }
+
+            // Horizontal Gridlines (Y Axis: Attendance or Assignment)
+            for (let y = 0; y <= 100; y += 10) {
+                let py = getYPixel(y);
+                // Line
+                let line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", padding.left);
+                line.setAttribute("y1", py);
+                line.setAttribute("x2", padding.left + plotW);
+                line.setAttribute("y2", py);
+                line.setAttribute("stroke", "currentColor");
+                line.setAttribute("class", "text-slate-200 dark:text-slate-800");
+                line.setAttribute("stroke-dasharray", "3 3");
+                gridGroup.appendChild(line);
+
+                // Label
+                let text = document.createElementNS(svgNS, "text");
+                text.setAttribute("x", padding.left - 12);
+                text.setAttribute("y", py + 4);
+                text.setAttribute("text-anchor", "end");
+                text.setAttribute("class", "text-[11px] fill-slate-400 dark:fill-slate-500 font-medium");
+                text.textContent = y + "%";
+                gridGroup.appendChild(text);
+            }
+            svg.appendChild(gridGroup);
+
+            // 2. Draw Axes Lines & Titles
+            const axesGroup = document.createElementNS(svgNS, "g");
+
+            // Main X & Y axis solid border
+            let xAxisLine = document.createElementNS(svgNS, "line");
+            xAxisLine.setAttribute("x1", padding.left);
+            xAxisLine.setAttribute("y1", padding.top + plotH);
+            xAxisLine.setAttribute("x2", padding.left + plotW);
+            xAxisLine.setAttribute("y2", padding.top + plotH);
+            xAxisLine.setAttribute("class", "stroke-slate-300 dark:stroke-slate-600");
+            xAxisLine.setAttribute("stroke-width", "1.5");
+            axesGroup.appendChild(xAxisLine);
+
+            let yAxisLine = document.createElementNS(svgNS, "line");
+            yAxisLine.setAttribute("x1", padding.left);
+            yAxisLine.setAttribute("y1", padding.top);
+            yAxisLine.setAttribute("x2", padding.left);
+            yAxisLine.setAttribute("y2", padding.top + plotH);
+            yAxisLine.setAttribute("class", "stroke-slate-300 dark:stroke-slate-600");
+            yAxisLine.setAttribute("stroke-width", "1.5");
+            axesGroup.appendChild(yAxisLine);
+
+            // Axis Title: X
+            let xLabel = document.createElementNS(svgNS, "text");
+            xLabel.setAttribute("x", padding.left + plotW / 2);
+            xLabel.setAttribute("y", height - 15);
+            xLabel.setAttribute("text-anchor", "middle");
+            xLabel.setAttribute("class", "text-xs font-semibold fill-slate-700 dark:fill-slate-300");
+            xLabel.textContent = "คะแนนรวมวิชาทั้งหมด (%) [ Total Score ]";
+            axesGroup.appendChild(xLabel);
+
+            // Axis Title: Y
+            let yLabel = document.createElementNS(svgNS, "text");
+            yLabel.setAttribute("x", -(padding.top + plotH / 2));
+            yLabel.setAttribute("y", 18);
+            yLabel.setAttribute("transform", "rotate(-90)");
+            yLabel.setAttribute("text-anchor", "middle");
+            yLabel.setAttribute("class", "text-xs font-semibold fill-slate-700 dark:fill-slate-300");
+            yLabel.textContent = currentYMetric === 'attendance' ? "คะแนนการเข้าเรียน (%) [ Attendance Rate ]" : "อัตราการส่งงาน (%) [ Assignment Submission Rate ]";
+            axesGroup.appendChild(yLabel);
+
+            svg.appendChild(axesGroup);
+
+            // 3. Render Student Data Points
+            const pointsGroup = document.createElementNS(svgNS, "g");
+            pointsGroup.setAttribute("class", "data-points");
+
+            processedStudents.forEach((student) => {
+                const px = getXPixel(student.xVal);
+                const py = getYPixel(student.yVal);
+                const isDimmed = currentHighlightCluster !== null && student.cluster !== currentHighlightCluster;
+
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", px);
+                circle.setAttribute("cy", py);
+                circle.setAttribute("r", isDimmed ? "4" : "6.5");
+                circle.setAttribute("class", "dot-point");
+                
+                // Color fill per cluster
+                let colorHex = clusterMeta[student.cluster].color;
+                circle.setAttribute("fill", colorHex);
+                circle.setAttribute("stroke", "#ffffff");
+                circle.setAttribute("stroke-width", "1.5");
+                circle.setAttribute("opacity", isDimmed ? "0.2" : "0.9");
+
+                // Hover Tooltip Events
+                circle.addEventListener("mouseenter", (e) => showTooltip(e, student));
+                circle.addEventListener("mousemove", (e) => updateTooltipPos(e));
+                circle.addEventListener("mouseleave", () => hideTooltip());
+
+                // Click Event -> Open Modal
+                circle.addEventListener("click", () => openStudentModal(student));
+
+                pointsGroup.appendChild(circle);
+            });
+            svg.appendChild(pointsGroup);
+
+            // 4. Render Centroids (Star markers with halo)
+            const centroidsGroup = document.createElementNS(svgNS, "g");
+            centroidsGroup.setAttribute("class", "centroids-group");
+
+            clusterCentroids.forEach((c) => {
+                const px = getXPixel(c.x);
+                const py = getYPixel(c.y);
+                const colorHex = clusterMeta[c.cluster].color;
+                const isDimmed = currentHighlightCluster !== null && c.cluster !== currentHighlightCluster;
+
+                const cGroup = document.createElementNS(svgNS, "g");
+                cGroup.setAttribute("class", "centroid-marker");
+                cGroup.setAttribute("opacity", isDimmed ? "0.2" : "1");
+
+                // Pulse Halo
+                const halo = document.createElementNS(svgNS, "circle");
+                halo.setAttribute("cx", px);
+                halo.setAttribute("cy", py);
+                halo.setAttribute("r", "16");
+                halo.setAttribute("fill", colorHex);
+                halo.setAttribute("class", "pulse-halo");
+                cGroup.appendChild(halo);
+
+                // Outer Ring
+                const ring = document.createElementNS(svgNS, "circle");
+                ring.setAttribute("cx", px);
+                ring.setAttribute("cy", py);
+                ring.setAttribute("r", "11");
+                ring.setAttribute("fill", "#0f172a");
+                ring.setAttribute("stroke", colorHex);
+                ring.setAttribute("stroke-width", "2.5");
+                cGroup.appendChild(ring);
+
+                // Centroid Star Center Icon
+                const star = document.createElementNS(svgNS, "path");
+                // Star path coordinates centered at (px, py)
+                const pathD = drawStarPath(px, py, 5, 6, 3);
+                star.setAttribute("d", pathD);
+                star.setAttribute("fill", "#fbbf24"); // Amber star
+                cGroup.appendChild(star);
+
+                // Centroid Label Text
+                const label = document.createElementNS(svgNS, "text");
+                label.setAttribute("x", px);
+                label.setAttribute("y", py - 18);
+                label.setAttribute("text-anchor", "middle");
+                label.setAttribute("class", "text-[10px] font-bold fill-slate-800 dark:fill-slate-100 backdrop-blur");
+                label.textContent = `Centroid G${c.cluster + 1} (${c.x}%, ${c.y}%)`;
+                cGroup.appendChild(label);
+
+                centroidsGroup.appendChild(cGroup);
+            });
+
+            svg.appendChild(centroidsGroup);
+        }
+
+        // Helper to draw SVG Star Path
+        function drawStarPath(cx, cy, spikes, outerRadius, innerRadius) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / spikes;
+            let path = "M " + cx + " " + (cy - outerRadius);
+
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                path += " L " + x + " " + y;
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                path += " L " + x + " " + y;
+                rot += step;
+            }
+            path += " Z";
+            return path;
+        }
+
+        /**
+         * Show floating tooltip on scatter plot hover
+         */
+        function showTooltip(evt, student) {
+            const tooltip = document.getElementById("scatterTooltip");
+            const meta = clusterMeta[student.cluster];
+            
+            tooltip.innerHTML = `
+                <div class="flex items-center justify-between pb-1.5 border-b border-slate-700/60 mb-2">
+                    <span class="font-bold text-sm text-white">${student.name}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" style="background-color: ${meta.color}; color: #fff;">
+                        ${meta.shortName}
+                    </span>
+                </div>
+                <div class="space-y-1 text-slate-300">
+                    <p class="flex justify-between"><span>รหัสนักเรียน:</span> <strong class="text-white">${student.id}</strong></p>
+                    <p class="flex justify-between"><span>คะแนนรวม (%):</span> <strong class="text-emerald-400">${student.score}%</strong></p>
+                    <p class="flex justify-between"><span>อัตราเข้าเรียน:</span> <strong class="text-sky-400">${student.attendance}%</strong></p>
+                    <p class="flex justify-between"><span>อัตราการส่งงาน:</span> <strong class="text-indigo-400">${student.submission}%</strong></p>
+                    <p class="flex justify-between"><span>งานค้างส่ง:</span> <strong class="${student.missing > 3 ? 'text-rose-400 font-bold' : 'text-slate-200'}">${student.missing} ชิ้น</strong></p>
+                </div>
+                <div class="mt-2 text-[10px] text-sky-400 text-center font-medium">
+                    <i class="fa-solid fa-hand-pointer mr-1"></i> คลิกเพื่อเปิดดูใบบันทึกรายงานส่วนตัว
+                </div>
+            `;
+
+            tooltip.classList.remove("hidden");
+            updateTooltipPos(evt);
+        }
+
+        function updateTooltipPos(evt) {
+            const tooltip = document.getElementById("scatterTooltip");
+            const container = tooltip.parentElement.getBoundingClientRect();
+            
+            // Calculate relative coordinates inside parent container
+            let x = evt.clientX - container.left;
+            let y = evt.clientY - container.top;
+
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById("scatterTooltip");
+            tooltip.classList.add("hidden");
+        }
+
+        /**
+         * Switch Y-Axis Metric (Attendance vs Assignment Submission Rate)
+         */
+        function setYAxisMetric(metric) {
+            currentYMetric = metric;
+
+            const btnAtt = document.getElementById("yAxisBtnAttendance");
+            const btnAss = document.getElementById("yAxisBtnAssignments");
+
+            if (metric === 'attendance') {
+                btnAtt.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-600";
+                btnAss.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+            } else {
+                btnAss.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-600";
+                btnAtt.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+            }
+
+            // Recalculate K-Means and update display
+            runKMeansClustering();
+            renderScatterPlot();
+            renderClusterCards();
+            renderPredictionTable();
+            updateStatCards();
+            showToast(`เปลี่ยนมุมมองแกน Y เป็น "${metric === 'attendance' ? 'คะแนนเข้าเรียน' : 'อัตราการส่งงาน'}" เรียบร้อยแล้ว`);
+        }
+
+        /**
+         * Highlight specific cluster on scatter plot
+         */
+        function highlightCluster(clusterId) {
+            if (currentHighlightCluster === clusterId) {
+                currentHighlightCluster = null;
+            } else {
+                currentHighlightCluster = clusterId;
+            }
+            renderScatterPlot();
+            renderClusterCards();
+        }
+
+        function resetPlotHighlight() {
+            currentHighlightCluster = null;
+            renderScatterPlot();
+            renderClusterCards();
+        }
+
+        /**
+         * Render bottom summary cluster cards with student list
+         */
+        function renderClusterCards() {
+            const container = document.getElementById("clusterCardsContainer");
+            container.innerHTML = "";
+
+            [0, 1, 2].forEach((cId) => {
+                const meta = clusterMeta[cId];
+                const list = processedStudents.filter(s => s.cluster === cId);
+                const isSelected = currentHighlightCluster === cId;
+
+                // Calculate average metrics
+                const avgScore = list.length ? (list.reduce((acc, s) => acc + s.score, 0) / list.length).toFixed(1) : 0;
+                const avgAtt = list.length ? (list.reduce((acc, s) => acc + s.attendance, 0) / list.length).toFixed(1) : 0;
+                const avgSub = list.length ? (list.reduce((acc, s) => acc + s.submission, 0) / list.length).toFixed(1) : 0;
+
+                const cardHtml = `
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border ${isSelected ? meta.badgeBorder + ' ring-2 ring-sky-500/30' : 'border-slate-200/80 dark:border-slate-700/80'} p-5 shadow-sm space-y-4 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <!-- Header Title -->
+                            <div class="flex items-center justify-between">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-bold border ${meta.bgBadge} flex items-center gap-1.5">
+                                    <i class="fa-solid ${meta.icon}"></i> ${meta.shortName}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    ${list.length} คน (${Math.round((list.length/processedStudents.length)*100)}%)
+                                </span>
+                            </div>
+
+                            <!-- Metrics Strip -->
+                            <div class="grid grid-cols-3 gap-2 mt-4 text-center bg-slate-50 dark:bg-slate-700/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
+                                <div>
+                                    <p class="text-[10px] text-slate-400">คะแนนเฉลี่ย</p>
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${avgScore}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-400">เข้าเรียนเฉลี่ย</p>
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${avgAtt}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-400">ส่งงานเฉลี่ย</p>
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${avgSub}%</p>
+                                </div>
+                            </div>
+
+                            <!-- Behavior Description & Advice -->
+                            <div class="mt-3 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                                <p class="leading-relaxed"><strong class="text-slate-700 dark:text-slate-200">ลักษณะพฤติกรรม:</strong> ${meta.desc}</p>
+                                <p class="leading-relaxed text-slate-500 dark:text-slate-400 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10">
+                                    <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i><strong>คำแนะนำ:</strong> ${meta.advice}
+                                </p>
+                            </div>
+
+                            <!-- Student Avatars & Names List -->
+                            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/70">
+                                <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2">รายชื่อนักเรียนในกลุ่มนี้:</p>
+                                <div class="max-h-40 overflow-y-auto pr-1 space-y-1.5">
+                                    ${list.map(s => `
+                                        <div onclick="openStudentModalById('${s.id}')" 
+                                             class="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer transition text-xs">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center shadow-xs" style="background-color: ${meta.color}">
+                                                    ${s.name.charAt(0)}
+                                                </div>
+                                                <span class="font-medium text-slate-700 dark:text-slate-200">${s.name}</span>
+                                            </div>
+                                            <span class="text-[10px] text-slate-400 font-mono">${s.score}% | ${s.missing} งาน</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card Action -->
+                        <div class="mt-4 pt-2">
+                            <button onclick="highlightCluster(${cId})" 
+                                class="w-full py-1.5 px-3 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-filter"></i>
+                                <span>${isSelected ? 'ยกเลิกการกรองเน้นจุด' : 'เน้นจุดเฉพาะกลุ่มนี้บนแผนภูมิ'}</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        /**
+         * Open Individual Student Modal
+         */
+        function openStudentModal(student) {
+            const modal = document.getElementById("studentModal");
+            const modalCard = document.getElementById("modalCard");
+            const meta = clusterMeta[student.cluster];
+
+            // Populate Student Data
+            document.getElementById("modalStudentName").innerText = student.name;
+            document.getElementById("modalStudentID").innerText = `รหัสนักเรียน: ${student.id}`;
+            document.getElementById("modalTotalScore").innerText = `${student.score}%`;
+            document.getElementById("modalAttendance").innerText = `${student.attendance}%`;
+            document.getElementById("modalAssignments").innerText = `${student.submission}%`;
+
+            // Avatar
+            const avatar = document.getElementById("modalStudentAvatar");
+            avatar.innerText = student.name.charAt(0);
+            avatar.style.backgroundColor = meta.color;
+
+            // Cluster Badge
+            const badge = document.getElementById("modalStudentClusterBadge");
+            badge.innerText = meta.shortName;
+            badge.className = `text-xs px-2.5 py-0.5 rounded-full font-semibold text-white`;
+            badge.style.backgroundColor = meta.color;
+
+            // Missing assignments alert status
+            const missingBox = document.getElementById("modalMissingBox");
+            const missingText = document.getElementById("modalMissingText");
+            const missingStatus = document.getElementById("modalMissingStatus");
+
+            missingText.innerText = `งานค้างส่งสะสม: ${student.missing} ชิ้น`;
+
+            if (student.missing === 0) {
+                missingBox.className = "p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-xs font-medium";
+                missingStatus.innerText = "ส่งงานครบถ้วนสมบูรณ์";
+            } else if (student.missing <= 2) {
+                missingBox.className = "p-3.5 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs font-medium";
+                missingStatus.innerText = "ตกค้างเล็กน้อย";
+            } else {
+                missingBox.className = "p-3.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 text-xs font-medium";
+                missingStatus.innerText = "ต้องตามงานด่วน";
+            }
+
+            // Recommendation Text
+            document.getElementById("modalRecommendation").innerText = meta.advice;
+
+            // Prediction fields
+            document.getElementById("modalPredictedScore").innerText = `${student.predictedScore}%`;
+            const riskEl = document.getElementById("modalRiskProbability");
+            riskEl.innerText = `${student.riskProbability}% (${student.riskLabel})`;
+            riskEl.style.color = student.riskColor;
+
+            // Grade badges
+            const gradeBadge = document.getElementById("modalGradeBadge");
+            gradeBadge.innerText = `เกรด ${student.currentGrade.letter} (${student.currentGrade.gpa.toFixed(2)})`;
+            gradeBadge.style.backgroundColor = student.currentGrade.color;
+
+            const predGradeBadge = document.getElementById("modalPredictedGradeBadge");
+            predGradeBadge.innerText = `เกรด ${student.predictedGrade.letter} (${student.predictedGrade.gpa.toFixed(2)})`;
+            predGradeBadge.style.backgroundColor = student.predictedGrade.color;
+
+            // Display Modal with animation
+            modal.classList.remove("hidden");
+            setTimeout(() => {
+                modalCard.classList.remove("scale-95", "opacity-0");
+                modalCard.classList.add("scale-100", "opacity-100");
+            }, 10);
+        }
+
+        function openStudentModalById(id) {
+            const student = processedStudents.find(s => s.id === id);
+            if (student) {
+                openStudentModal(student);
+            }
+        }
+
+        function closeStudentModal() {
+            const modal = document.getElementById("studentModal");
+            const modalCard = document.getElementById("modalCard");
+
+            modalCard.classList.remove("scale-100", "opacity-100");
+            modalCard.classList.add("scale-95", "opacity-0");
+
+            setTimeout(() => {
+                modal.classList.add("hidden");
+            }, 200);
+        }
+
+        /**
+         * Search filter students by name
+         */
+        function filterStudentsByName() {
+            const query = document.getElementById("studentSearchInput").value.toLowerCase().trim();
+            if (!query) {
+                currentHighlightCluster = null;
+                renderScatterPlot();
+                return;
+            }
+
+            const matched = processedStudents.find(s => s.name.toLowerCase().includes(query));
+            if (matched) {
+                showToast(`พบข้อมูล: ${matched.name} (${clusterMeta[matched.cluster].shortName})`);
+            }
+        }
+
+        /**
+         * Dark/Light mode theme toggle
+         */
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains("dark")) {
+                html.classList.remove("dark");
+                localStorage.setItem("theme", "light");
+                showToast("เปลี่ยนเป็นโหมดสว่าง (Light Mode)");
+            } else {
+                html.classList.add("dark");
+                localStorage.setItem("theme", "dark");
+                showToast("เปลี่ยนเป็นโหมดมืด (Dark Mode)");
+            }
+        }
+
+        /**
+         * Toast message helper
+         */
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toastMsg");
+            toastMsg.innerText = message;
+            toast.classList.remove("hidden");
+            toast.classList.add("flex");
+
+            setTimeout(() => {
+                toast.classList.add("hidden");
+                toast.classList.remove("flex");
+            }, 2800);
+        }
+
+        function alertAction(msg) {
+            showToast(msg);
+        }
+
+        function exportData() {
+            showToast("ระบบกำลังจัดทำไฟล์รายงาน CSV สำหรับส่งออก...");
+        }
+
+        // Initial Load Event Listener
+        window.onload = function () {
+            // Run K-Means Clustering on Startup
+            runKMeansClustering();
+
+            // Render Scatter Plot and Cards
+            renderScatterPlot();
+            renderClusterCards();
+            renderPredictionTable();
+            updateStatCards();
+
+            // Window Resize Listener for Responsive SVG Plot
+            window.addEventListener('resize', () => {
+                renderScatterPlot();
+            });
+        };
+    </script>
+</body>
+</html>
