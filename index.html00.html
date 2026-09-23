@@ -1,0 +1,2450 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สมุดพกอัจฉริยะ - Educational Analytics Dashboard</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        },
+                        cluster0: {
+                            light: '#10b981',
+                            DEFAULT: '#059669',
+                            dark: '#047857',
+                            bg: 'rgba(16, 185, 129, 0.15)'
+                        },
+                        cluster1: {
+                            light: '#3b82f6',
+                            DEFAULT: '#2563eb',
+                            dark: '#1d4ed8',
+                            bg: 'rgba(59, 130, 246, 0.15)'
+                        },
+                        cluster2: {
+                            light: '#f43f5e',
+                            DEFAULT: '#e11d48',
+                            dark: '#be123c',
+                            bg: 'rgba(244, 63, 94, 0.15)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Prompt', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Prompt', 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Decorative ambient gradient blobs behind all content */
+        .bg-blob {
+            position: fixed;
+            border-radius: 9999px;
+            filter: blur(90px);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.35;
+            animation: blob-float 14s ease-in-out infinite;
+        }
+        .dark .bg-blob { opacity: 0.18; }
+        @keyframes blob-float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -20px) scale(1.08); }
+        }
+
+        /* Anchor targets should clear the sticky header + section nav */
+        .anchor-section {
+            scroll-margin-top: 7.5rem;
+        }
+
+        /* Lift effect for interactive cards */
+        .lift-card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .lift-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px -10px rgba(14, 165, 233, 0.25);
+        }
+
+        /* Sub-navigation active pill */
+        .subnav-link {
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* SVG Point animations & glow */
+        .dot-point {
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), r 0.25s ease, fill 0.3s, opacity 0.3s;
+            cursor: pointer;
+        }
+        .dot-point:hover {
+            r: 9px;
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+
+        .centroid-marker {
+            transition: transform 0.4s ease, fill 0.3s;
+            cursor: pointer;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.25); opacity: 0.3; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .pulse-halo {
+            transform-origin: center;
+            animation: pulse-ring 2.5s infinite ease-in-out;
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.05);
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+
+        /* Role switcher (teacher / student view) */
+        body.role-student .role-teacher-only { display: none !important; }
+        body.role-teacher .role-student-only { display: none !important; }
+        .role-btn.active {
+            background-color: #fff;
+            color: #0284c7;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        .dark .role-btn.active {
+            background-color: rgb(30 41 59);
+            color: #38bdf8;
+        }
+    </style>
+</head>
+<body class="role-teacher bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col antialiased">
+
+    <!-- Decorative ambient background (purely visual, non-interactive) -->
+    <div class="bg-blob w-72 h-72 sm:w-96 sm:h-96 bg-sky-400 -top-20 -left-20"></div>
+    <div class="bg-blob w-72 h-72 sm:w-96 sm:h-96 bg-purple-400 top-1/3 -right-24" style="animation-delay: -6s;"></div>
+    <div class="bg-blob w-64 h-64 sm:w-80 sm:h-80 bg-emerald-300 bottom-0 left-1/4" style="animation-delay: -10s;"></div>
+
+    <!-- Top Header Navigation -->
+    <header class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight bg-gradient-to-r from-sky-600 via-indigo-500 to-purple-600 bg-clip-text text-transparent">
+                        สมุดพกอัจฉริยะ
+                    </h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        Educational Analytics & K-Means Behavior System
+                        <span class="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 text-[10px] font-semibold">
+                            <i class="fa-solid fa-sparkles text-[9px]"></i> AI Insights
+                        </span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right side action toolbar -->
+            <div class="flex items-center gap-3">
+                <!-- Search Student Input -->
+                <div class="relative hidden md:block w-64">
+                    <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="studentSearchInput" onkeyup="filterStudentsByName()" placeholder="ค้นหาชื่อผู้เรียน..." 
+                        class="w-full pl-9 pr-4 py-1.5 text-sm bg-slate-100 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white transition">
+                </div>
+
+                <!-- Dark / Light Theme Toggle -->
+                <button onclick="toggleTheme()" id="themeToggleBtn" aria-label="Toggle Theme" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                    <i class="fa-solid fa-moon text-base dark:hidden"></i>
+                    <i class="fa-solid fa-sun text-base hidden dark:block text-amber-400"></i>
+                </button>
+
+                <!-- Export Data Button -->
+                <button onclick="exportData()" class="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                    <i class="fa-solid fa-download"></i>
+                    <span>ส่งออกข้อมูล</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Role Switcher: Teacher vs Student view -->
+        <div class="border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-800/40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2">
+                <span class="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide hidden sm:inline">มุมมอง:</span>
+                <div class="inline-flex bg-slate-200/70 dark:bg-slate-700/60 rounded-lg p-1 gap-1">
+                    <button id="roleTeacherBtn" onclick="setRole('teacher')" class="role-btn px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                        <i class="fa-solid fa-chalkboard-user"></i> อาจารย์
+                    </button>
+                    <button id="roleStudentBtn" onclick="setRole('student')" class="role-btn px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                        <i class="fa-solid fa-user-graduate"></i> นักศึกษา
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Quick-Nav -->
+        <div id="sectionQuickNav" class="role-teacher-only border-t border-slate-100 dark:border-slate-700/60">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2 overflow-x-auto">
+                <a href="#section-overview" class="subnav-link shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70">
+                    <i class="fa-solid fa-gauge-high text-sky-500"></i> ภาพรวม
+                </a>
+                <a href="#section-cluster" class="subnav-link shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70">
+                    <i class="fa-solid fa-diagram-project text-indigo-500"></i> การจัดกลุ่ม
+                </a>
+                <a href="#section-risk" class="subnav-link shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70">
+                    <i class="fa-solid fa-chart-line text-rose-500"></i> ความเสี่ยง
+                </a>
+                <a href="#section-quiz" class="subnav-link shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/70">
+                    <i class="fa-solid fa-book-open-reader text-amber-500"></i> ทบทวนความรู้
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Top Overview Stats Row -->
+        <div id="section-overview" class="role-teacher-only anchor-section grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="lift-card bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">ผู้เรียนทั้งหมด</p>
+                    <h3 class="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100" id="statTotalStudents">36</h3>
+                    <p class="text-xs text-emerald-500 font-medium mt-1"><i class="fa-solid fa-check-circle mr-1"></i>ครบ 100% รายชื่อ</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+
+            <div class="lift-card bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">คะแนนเฉลี่ยห้อง</p>
+                    <h3 class="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100" id="statAvgScore">74.8%</h3>
+                    <p class="text-xs text-sky-500 font-medium mt-1"><i class="fa-solid fa-chart-simple mr-1"></i><span id="statAvgGPA">GPA เฉลี่ย --</span></p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+            </div>
+
+            <div class="lift-card bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">อัตราเข้าเรียนเฉลี่ย</p>
+                    <h3 class="text-2xl font-bold mt-1 text-slate-800 dark:text-slate-100" id="statAvgAttendance">88.5%</h3>
+                    <p class="text-xs text-emerald-500 font-medium mt-1"><i class="fa-solid fa-user-check mr-1"></i>อยู่ในเกณฑ์ดี</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-calendar-check"></i>
+                </div>
+            </div>
+
+            <div class="lift-card bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">กลุ่มเฝ้าระวัง (At-Risk)</p>
+                    <h3 class="text-2xl font-bold mt-1 text-rose-600 dark:text-rose-400" id="statAtRiskCount">7 คน</h3>
+                    <p class="text-xs text-rose-500 font-medium mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>ต้องดูแลใกล้ชิด</p>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Primary K-Means Scatter Plot Container -->
+        <div id="section-cluster" class="role-teacher-only anchor-section bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm space-y-4">
+            
+            <!-- Scatter Controls & Header -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-sm">
+                            <i class="fa-solid fa-diagram-project"></i>
+                        </span>
+                        <h2 class="text-lg font-bold text-slate-800 dark:text-slate-100">
+                            การจัดกลุ่มพฤติกรรมผู้เรียน (K-Means Scatter Plot)
+                        </h2>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        แผนภูมิแบบจุดโต้ตอบได้ จัดกลุ่มด้วย K-Means จาก 4 ตัวแปร (คะแนน, การเข้าเรียน, การส่งงาน, ผลทบทวนความรู้ท้ายบท) — แกนที่แสดงเป็นเพียงมุมมอง 2 มิติของการจัดกลุ่มจริง
+                    </p>
+                    <p id="clusterQualityBadge" class="text-[11px] font-medium text-slate-400 dark:text-slate-500 mt-1">
+                        <i class="fa-solid fa-circle-notch fa-spin mr-1"></i>กำลังคำนวณคุณภาพการจัดกลุ่ม...
+                    </p>
+                </div>
+
+                <!-- Y-Axis Metric Selector Control -->
+                <div class="flex items-center gap-3 self-start md:self-auto bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl border border-slate-200 dark:border-slate-600">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300 pl-2">แกน Y:</span>
+                    <button id="yAxisBtnAttendance" onclick="setYAxisMetric('attendance')" 
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-600">
+                        <i class="fa-solid fa-user-clock mr-1"></i> คะแนนเข้าเรียน (%)
+                    </button>
+                    <button id="yAxisBtnAssignments" onclick="setYAxisMetric('assignments')" 
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">
+                        <i class="fa-solid fa-file-signature mr-1"></i> อัตราการส่งงาน (%)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Legend Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-3 text-xs px-1 py-1">
+                <div class="flex flex-wrap items-center gap-4">
+                    <!-- Cluster 0 Legend -->
+                    <div class="flex items-center gap-2 cursor-pointer opacity-100 hover:opacity-80 transition" onclick="highlightCluster(0)">
+                        <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-sm inline-block"></span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">กลุ่ม 1: เรียนดี-มีวินัยสูง</span>
+                    </div>
+                    <!-- Cluster 1 Legend -->
+                    <div class="flex items-center gap-2 cursor-pointer opacity-100 hover:opacity-80 transition" onclick="highlightCluster(1)">
+                        <span class="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-sm inline-block"></span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">กลุ่ม 2: ปานกลาง-พยายามดี</span>
+                    </div>
+                    <!-- Cluster 2 Legend -->
+                    <div class="flex items-center gap-2 cursor-pointer opacity-100 hover:opacity-80 transition" onclick="highlightCluster(2)">
+                        <span class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-sm inline-block"></span>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">กลุ่ม 3: เสี่ยง-ต้องช่วยเหลือ</span>
+                    </div>
+                    <!-- Centroid Legend -->
+                    <div class="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+                        <span class="text-amber-500 font-bold text-sm"><i class="fa-solid fa-star"></i></span>
+                        <span class="font-medium text-slate-600 dark:text-slate-400">จุดศูนย์กลางกลุ่ม (Centroid)</span>
+                    </div>
+                </div>
+
+                <button onclick="resetPlotHighlight()" class="text-xs text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1">
+                    <i class="fa-solid fa-rotate-left"></i> แสดงทั้งหมด
+                </button>
+            </div>
+
+            <!-- SVG Scatter Plot Canvas Container -->
+            <div class="relative w-full overflow-hidden bg-slate-50/70 dark:bg-slate-900/50 rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-2 sm:p-4">
+                
+                <!-- Floating Dynamic SVG Canvas -->
+                <svg id="scatterSvg" class="w-full h-[380px] sm:h-[440px] select-none" viewBox="0 0 800 480" preserveAspectRatio="xMidYMid meet">
+                    <!-- SVG elements generated dynamically via JavaScript -->
+                </svg>
+
+                <!-- Floating Tooltip Container -->
+                <div id="scatterTooltip" class="absolute hidden pointer-events-none z-20 bg-slate-900/95 text-white dark:bg-slate-800/95 dark:text-slate-100 p-3 rounded-xl shadow-xl border border-slate-700 backdrop-blur-md text-xs w-60 transition-opacity duration-150 transform -translate-x-1/2 -translate-y-full mb-3">
+                    <!-- Tooltip content rendered dynamically -->
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-400 dark:text-slate-500 text-center italic">
+                <i class="fa-solid fa-circle-info mr-1"></i> คำแนะนำ: นำเมาส์ไปชี้ที่จุดเพื่อดูข้อมูลนักเรียน หรือ คลิกที่จุดเพื่อเปิดดูสมุดพกรายงานส่วนบุคคล
+            </p>
+        </div>
+
+        <!-- Cluster Breakdown Summary Cards -->
+        <div class="space-y-3">
+            <h3 class="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-cubes text-sky-500"></i>
+                <span>สรุปจำแนกพฤติกรรมและรายชื่อนักเรียนรายกลุ่ม</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5" id="clusterCardsContainer">
+                <!-- Cluster Cards rendered by JS -->
+            </div>
+        </div>
+
+        <!-- Predictive Risk Ranking Table -->
+        <div id="section-risk" class="role-teacher-only anchor-section space-y-3">
+            <h3 class="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-rose-500"></i>
+                <span>การคาดการณ์แนวโน้มผลการเรียนรายบุคคล (Predictive Risk Ranking)</span>
+            </h3>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm">
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                    เรียงลำดับจากความเสี่ยงไม่ผ่านเกณฑ์ (คาดการณ์) สูงสุดไปต่ำสุด — คลิกที่แถวเพื่อดูสมุดพกรายบุคคล
+                </p>
+                <div class="overflow-x-auto max-h-96 overflow-y-auto rounded-xl border border-slate-100 dark:border-slate-700/60">
+                    <table class="w-full text-xs text-left border-collapse">
+                        <thead class="sticky top-0 bg-slate-50 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 z-10">
+                            <tr>
+                                <th class="px-3 py-2 font-semibold">ชื่อ-นามสกุล</th>
+                                <th class="px-3 py-2 font-semibold text-center">คะแนนปัจจุบัน</th>
+                                <th class="px-3 py-2 font-semibold text-center">เกรดปัจจุบัน</th>
+                                <th class="px-3 py-2 font-semibold text-center">คะแนนคาดการณ์*</th>
+                                <th class="px-3 py-2 font-semibold text-center">เกรดคาดการณ์*</th>
+                                <th class="px-3 py-2 font-semibold text-center">ความเสี่ยงไม่ผ่าน</th>
+                                <th class="px-3 py-2 font-semibold text-center">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="predictionTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                            <!-- Rendered by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 italic mt-3">
+                    * คะแนนคาดการณ์คำนวณจากคะแนนปัจจุบันบวกคะแนนที่มีโอกาสได้คืนหากส่งงานค้างครบ (สูตรคณิตศาสตร์ตรงไปตรงมา ไม่ใช่ ML) ส่วน "ความเสี่ยงไม่ผ่านเกณฑ์" มาจากโมเดล Logistic Regression ที่ฝึก (train) ด้วยข้อมูลอัตราเข้าเรียน/ส่งงาน/งานค้างของนักเรียนชุดนี้จริง (ดูค่าความแม่นยำของโมเดลด้านล่าง) — แต่ยังเป็นการฝึกจากข้อมูลภาคเรียนเดียวชุดเดียว (cross-sectional) ไม่ใช่ข้อมูลย้อนหลังหลายภาคเรียน จึงควรใช้เป็นข้อมูลประกอบการดูแลนักเรียนเบื้องต้นเท่านั้น
+                </p>
+            </div>
+        </div>
+
+        <!-- Chapter Knowledge Review (Quiz) Section -->
+        <div id="section-quiz" class="anchor-section space-y-3">
+            <h3 class="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <i class="fa-solid fa-book-open-reader text-amber-500"></i>
+                <span>ทบทวนความรู้รายบทเรียน (Chapter Knowledge Review)</span>
+            </h3>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 p-5 shadow-sm space-y-4">
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    แบบทดสอบสั้นๆ ท้ายแต่ละบทเรียนสำหรับนักเรียนใช้ทบทวนความเข้าใจด้วยตนเอง ผลคะแนนของแต่ละคนจะถูกนำไป
+                    <span class="font-semibold text-amber-600 dark:text-amber-400">ป้อนกลับเข้าโมเดล K-Means และ Logistic Regression</span>
+                    เป็นอีกหนึ่งตัวแปรเสริม (นอกจากคะแนน/การเข้าเรียน/การส่งงาน) เพื่อให้การจัดกลุ่มและประเมินความเสี่ยงสะท้อนความเข้าใจเนื้อหาจริงของนักเรียนด้วย
+                </p>
+
+                <!-- Student Picker for tying quiz results to the ML pipeline -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50 dark:bg-slate-700/40 border border-slate-200/70 dark:border-slate-600/60 rounded-xl p-3">
+                    <label class="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
+                        <i class="fa-solid fa-user-graduate text-sky-500"></i> ทำแบบทดสอบในฐานะ:
+                    </label>
+                    <select id="quizStudentSelect" onchange="onQuizStudentChange()"
+                        class="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white">
+                        <!-- options populated by JS -->
+                    </select>
+                </div>
+
+                <!-- Personal adaptive recommendation (student view only) -->
+                <div id="studentPersonalPanel" class="role-student-only bg-gradient-to-br from-sky-50 to-indigo-50 dark:from-sky-950/30 dark:to-indigo-950/30 border border-sky-100 dark:border-sky-900/40 rounded-xl p-4 text-xs space-y-1.5">
+                    <!-- rendered by JS: renderStudentPersonalPanel() -->
+                </div>
+
+                <!-- Class-wide quiz participation summary (teacher view only) -->
+                <div id="quizClassSummary" class="role-teacher-only grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <!-- rendered by JS -->
+                </div>
+
+                <div id="quizChapterGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Chapter cards rendered by JS -->
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Individual Student Profile Modal -->
+    <div id="studentModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-xl w-full border border-slate-200 dark:border-slate-700 shadow-2xl overflow-hidden transform transition-all duration-200 scale-95 opacity-0" id="modalCard">
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-slate-100 dark:border-slate-700/70 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50" id="modalHeaderBg">
+                <div class="flex items-center gap-4">
+                    <div id="modalStudentAvatar" class="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">
+                        --
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 id="modalStudentName" class="text-lg font-bold text-slate-800 dark:text-white">ชื่อ นักเรียน</h3>
+                            <span id="modalStudentClusterBadge" class="text-xs px-2.5 py-0.5 rounded-full font-semibold">กลุ่ม --</span>
+                        </div>
+                        <p id="modalStudentID" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">รหัสนักเรียน: STU-XXXX</p>
+                    </div>
+                </div>
+                <button onclick="closeStudentModal()" class="w-8 h-8 rounded-lg bg-slate-200/60 dark:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body Stats -->
+            <div class="p-6 space-y-5">
+                <!-- Performance Metrics Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">คะแนนรวม (%)</p>
+                        <p id="modalTotalScore" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">0%</p>
+                        <span id="modalGradeBadge" class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white">--</span>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">การเข้าเรียน</p>
+                        <p id="modalAttendance" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">0%</p>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">การส่งงาน</p>
+                        <p id="modalAssignments" class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-1">0%</p>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">ผลทบทวนความรู้</p>
+                        <p id="modalQuizAvg" class="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">--</p>
+                    </div>
+                </div>
+
+                <!-- Missing Work Alert -->
+                <div id="modalMissingBox" class="p-3.5 rounded-xl border flex items-center justify-between text-xs font-medium">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-500 text-sm"></i>
+                        <span id="modalMissingText">งานค้างชำระ / ขาดส่ง: 0 ชิ้น</span>
+                    </span>
+                    <span id="modalMissingStatus" class="font-bold">--</span>
+                </div>
+
+                <!-- Prediction Block -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-line text-sky-500"></i> การคาดการณ์แนวโน้มผลการเรียน
+                    </h4>
+                    <div class="grid grid-cols-2 gap-3 text-center">
+                        <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">คะแนนคาดการณ์ (หากส่งงานค้างครบ)</p>
+                            <p id="modalPredictedScore" class="text-xl font-bold text-sky-600 dark:text-sky-400 mt-1">0%</p>
+                            <span id="modalPredictedGradeBadge" class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white">--</span>
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">ความเสี่ยงไม่ผ่านเกณฑ์ (คาดการณ์)</p>
+                            <p id="modalRiskProbability" class="text-xl font-bold mt-1">0%</p>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-400 dark:text-slate-500 italic leading-relaxed">
+                        * ความเสี่ยงคำนวณจากโมเดล Logistic Regression ที่ฝึกด้วย 4 ตัวแปร: อัตราการเข้าเรียน, อัตราการส่งงาน, จำนวนงานค้าง และผลทบทวนความรู้ท้ายบท ของนักเรียนทั้งห้อง (<span id="modalModelAccuracyNote">--</span>) นักเรียนที่ยังไม่เคยทำแบบทดสอบทบทวนจะถูกแทนค่าด้วยค่าเฉลี่ยของห้องชั่วคราว เพื่อใช้ประกอบการดูแลนักเรียนเบื้องต้น ยังไม่ใช่โมเดลที่ผ่านการฝึกฝนและตรวจสอบด้วยข้อมูลย้อนหลังหลายภาคเรียน
+                    </p>
+                </div>
+
+                <!-- Teacher Recommendations -->
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i> ข้อเสนอแนะเชิงพฤติกรรมและการดูแล
+                    </h4>
+                    <p id="modalRecommendation" class="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/30 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 leading-relaxed">
+                        --
+                    </p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+                <button onclick="closeStudentModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition">
+                    ปิด
+                </button>
+                <button onclick="goToStudentQuiz()" id="modalGoToQuizBtn" class="px-4 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-book-open-reader"></i> ทบทวนความรู้
+                </button>
+                <button onclick="alertAction('พิมพ์ใบบันทึกรายงานส่วนตัวเรียบร้อยแล้ว')" class="px-4 py-2 text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i> พิมพ์ใบบันทึก
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chapter Quiz Modal -->
+    <div id="quizModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+        <div id="quizModalCard" class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-lg w-full transform scale-95 opacity-0 transition-all duration-200 overflow-hidden">
+
+            <!-- Quiz Header -->
+            <div class="px-6 py-4 bg-gradient-to-r from-sky-600 to-indigo-600 text-white flex items-center justify-between">
+                <div>
+                    <p class="text-[11px] font-medium text-sky-100" id="quizProgressText">ข้อ 1 / 4</p>
+                    <h3 class="font-bold text-base" id="quizChapterTitle">ชื่อบทเรียน</h3>
+                </div>
+                <button onclick="closeQuizModal()" class="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="h-1.5 bg-slate-100 dark:bg-slate-700">
+                <div id="quizProgressBar" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%;"></div>
+            </div>
+
+            <!-- Question View -->
+            <div id="quizQuestionView" class="p-6 space-y-4">
+                <p id="quizQuestionText" class="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed"></p>
+                <div id="quizOptionsWrap" class="space-y-2.5"></div>
+                <div id="quizFeedback" class="hidden text-xs p-3 rounded-xl bg-slate-50 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 leading-relaxed"></div>
+                <div id="quizLiveStats" class="flex flex-wrap items-center gap-x-1 text-[11px] font-medium text-slate-500 dark:text-slate-400"></div>
+                <div id="quizAdaptiveNotice" class="hidden text-xs p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 leading-relaxed">
+                    <p class="font-semibold flex items-center gap-1.5 mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> ระบบปรับเนื้อหาให้อัตโนมัติ</p>
+                    <p id="quizAdaptiveNoticeText"></p>
+                </div>
+            </div>
+
+            <!-- Result View -->
+            <div id="quizResultView" class="hidden p-8 text-center space-y-3">
+                <div class="w-16 h-16 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-500 flex items-center justify-center text-2xl">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <h4 class="font-bold text-lg text-slate-800 dark:text-slate-100">ทำแบบทดสอบเสร็จแล้ว!</h4>
+                <p class="text-2xl font-extrabold text-sky-600 dark:text-sky-400" id="quizResultScore">0 / 0</p>
+                <p class="text-sm font-medium text-slate-500 dark:text-slate-400" id="quizResultPct">0%</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400" id="quizResultMsg"></p>
+            </div>
+
+            <!-- Quiz Footer -->
+            <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+                <button onclick="closeQuizModal()" id="quizCloseBtn" class="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition">
+                    ปิด
+                </button>
+                <button onclick="retryQuiz()" id="quizRetryBtn" class="hidden px-4 py-2 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white rounded-lg shadow-sm transition items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right"></i> ทำอีกครั้ง
+                </button>
+                <button onclick="nextQuizQuestion()" id="quizNextBtn" disabled class="opacity-50 cursor-not-allowed px-4 py-2 text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    ถัดไป <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl text-xs font-medium items-center gap-2 border border-slate-700 transition">
+        <i class="fa-solid fa-circle-check text-emerald-400 dark:text-emerald-600 text-base"></i>
+        <span id="toastMsg">ข้อความแจ้งเตือน</span>
+    </div>
+
+    <script>
+        // Data Set: 29 Students - รายวิชา Educational Technology and Gamification (ภาคเรียนที่ 1/2569)
+        // score = คะแนนรวม 9 หัวข้อ (เต็ม 100) | attendance = %การเข้าเรียน | submission = %ชิ้นงานปฏิบัติที่ส่ง (จาก 7 ชิ้น) | missing = จำนวนชิ้นงานที่ขาดส่ง
+        const rawStudentsData = [
+            { id: "683450038-1", name: "นางสาวชาลิสา สุโคตร", score: 51.20, attendance: 10, submission: 71, missing: 2 },
+            { id: "683450039-9", name: "นางสาวณัฐกมล วรดี", score: 48.28, attendance: 10, submission: 71, missing: 2 },
+            { id: "683450040-4", name: "นางสาวณัฐณิชา ชัยจิต", score: 66.28, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450041-2", name: "นางสาวณัฐวดี แสงมูล", score: 73.50, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450042-0", name: "นายปภังกร แก้วจันทร์", score: 71.38, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450043-8", name: "นายปุระเชษฐ จำปาบุรี", score: 71.20, attendance: 30, submission: 100, missing: 0 },
+            { id: "683450044-6", name: "นางสาวพาณิภัค พระเห็นศรี", score: 61.80, attendance: 20, submission: 86, missing: 1 },
+            { id: "683450045-4", name: "นายภานุวัฒน์ พันธ์ทอง", score: 71.28, attendance: 10, submission: 100, missing: 0 },
+            { id: "683450046-2", name: "นางสาวภูวศา เกษมสุวรรณ", score: 72.00, attendance: 20, submission: 100, missing: 0 },
+            { id: "683450047-0", name: "นายรัชชานนท์ เสนา", score: 53.90, attendance: 30, submission: 71, missing: 2 },
+            { id: "683450048-8", name: "นางสาวศศิปรียา คตภูธร", score: 41.90, attendance: 20, submission: 71, missing: 2 },
+            { id: "683450050-1", name: "นางสาวอัญธิชา แสงสุริยะ", score: 71.90, attendance: 20, submission: 100, missing: 0 },
+            { id: "683450173-5", name: "นางสาวกุลนันทน์ ลมอ่อน", score: 58.70, attendance: 15, submission: 86, missing: 1 },
+            { id: "683450174-3", name: "นางสาวจิราพัชร บุตรพะวงค์", score: 46.30, attendance: 25, submission: 71, missing: 2 },
+            { id: "683450175-1", name: "นางสาวทักษพร เที่ยงนา", score: 60.28, attendance: 25, submission: 86, missing: 1 },
+            { id: "683450176-9", name: "นายทักษิณ รัตนวัน", score: 73.58, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450177-7", name: "นางสาวธิติยา วงถวิล", score: 27.60, attendance: 0, submission: 43, missing: 4 },
+            { id: "683450178-5", name: "นายพงษ์ศิริ จันทร์กอง", score: 56.75, attendance: 25, submission: 86, missing: 1 },
+            { id: "683450179-3", name: "นางสาวพิณรฎา เขตจัตุรัส", score: 61.30, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450180-8", name: "นายวชิรวิทย์ ฉลูทอง", score: 72.00, attendance: 25, submission: 100, missing: 0 },
+            { id: "683450181-6", name: "นางสาวศิริโสภา สร้างโสภา", score: 59.80, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450182-4", name: "นางสาวสินนภา คุณเคน", score: 52.30, attendance: 20, submission: 86, missing: 1 },
+            { id: "683450343-6", name: "นางสาวกัญญาณัฐ วรรณวิเศษ", score: 75.80, attendance: 30, submission: 100, missing: 0 },
+            { id: "683450344-4", name: "นางสาวขวัญชนก คำสุนันท์", score: 62.78, attendance: 30, submission: 86, missing: 1 },
+            { id: "683450345-2", name: "นางสาวชนมน สุพรรณ", score: 58.80, attendance: 20, submission: 86, missing: 1 },
+            { id: "683450346-0", name: "นายธนวัฒน์ ประกอบการ", score: 58.10, attendance: 30, submission: 71, missing: 2 },
+            { id: "683450347-8", name: "นางสาวบุญญธิดา ธรรมบุตร", score: 63.80, attendance: 15, submission: 86, missing: 1 },
+            { id: "683450348-6", name: "นายพสิษฐ์ ฤทธิเลิศวิริยะ", score: 53.48, attendance: 15, submission: 86, missing: 1 },
+            { id: "683450349-4", name: "นางสาวพิมพ์ชนก เสมอไว", score: 49.30, attendance: 30, submission: 71, missing: 2 }
+        ];
+
+        // Global State Configuration
+        let currentYMetric = 'attendance'; // 'attendance' or 'assignments'
+        let currentHighlightCluster = null; // null or 0, 1, 2
+        let processedStudents = [];
+        let clusterCentroids = [];
+        let lastSilhouette = null;
+        let riskModel = null;          // { weights: [wAtt, wSub, wMiss], bias, accuracy }
+        let riskFeatureStats = null;   // z-score mean/std for attendance, submission, missing
+
+        // Cluster Definitions & Meta
+        const clusterMeta = {
+            0: {
+                name: "กลุ่มที่ 1: เรียนดี-มีวินัยสูง (High Achievers)",
+                shortName: "กลุ่มเรียนดี-มีวินัยสูง",
+                color: "#10b981",
+                darkColor: "#059669",
+                bgBadge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-300",
+                badgeBorder: "border-emerald-500",
+                icon: "fa-award",
+                desc: "นักเรียนมีความรับผิดชอบสูง ส่งงานตรงเวลา ผลการเรียนและอัตราการเข้าเรียนสม่ำเสมอในระดับยอดเยี่ยม",
+                advice: "ส่งเสริมกิจกรรมท้าทายความสามารถ (Enrichment) มอบหมายบทบาทผู้นำกลุ่ม หรือส่งเสริมการแข่งขันทางวิชาการ"
+            },
+            1: {
+                name: "กลุ่มที่ 2: ปานกลาง-พยายามดี (Moderate Effort)",
+                shortName: "กลุ่มปานกลาง-พยายามดี",
+                color: "#3b82f6",
+                darkColor: "#2563eb",
+                bgBadge: "bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border-blue-300",
+                badgeBorder: "border-blue-500",
+                icon: "fa-user-check",
+                desc: "ผลการเรียนและการเข้าเรียนอยู่ในเกณฑ์มาตรฐาน มีความตั้งใจเรียนแต่อาจยังมีชิ้นงานตกค้างเล็กน้อย",
+                advice: "ให้คำแนะนำรายบุคคลในจุดที่ยังไม่เข้าใจ เพิ่มแรงจูงใจในการส่งงานให้ตรงเวลา และกระตุ้นการมีส่วนร่วมในชั้นเรียน"
+            },
+            2: {
+                name: "กลุ่มที่ 3: เสี่ยง-ต้องช่วยเหลือ (At-Risk / Needs Support)",
+                shortName: "กลุ่มเสี่ยง-ต้องช่วยเหลือ",
+                color: "#f43f5e",
+                darkColor: "#e11d48",
+                bgBadge: "bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border-rose-300",
+                badgeBorder: "border-rose-500",
+                icon: "fa-triangle-exclamation",
+                desc: "มีอัตราขาดเรียนหรือส่งงานล่าช้าสูง ผลการเรียนอยู่ในเกณฑ์เฝ้าระวัง มีงานตกค้างหลายชิ้น",
+                advice: "จัดทำแผนช่วยเหลือเร่งด่วน (Intervention) นัดหมายพูดคุยกับผู้ปกครอง และจัดระบบเพื่อนช่วยเพื่อน (Peer Tutoring)"
+            }
+        };
+
+        /**
+         * predictedScore: transparent arithmetic estimate (current score + recoverable credit), NOT a model.
+         * riskProbability: output of an actually-trained Logistic Regression (see trainRiskModel()),
+         * fit by gradient descent on this class's own attendance / submission / missing-work data.
+         */
+        const PASS_THRESHOLD = 50; // เกณฑ์ผ่านที่ใช้อ้างอิงในการประมาณความเสี่ยง (สมมติฐาน)
+
+        /** z-score standardization helper: returns {mean, std, z:[...]} */
+        function standardize(values) {
+            const n = values.length;
+            const mean = values.reduce((a, b) => a + b, 0) / n;
+            const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+            const std = Math.sqrt(variance) || 1; // guard against divide-by-zero
+            return { mean, std, z: values.map(v => (v - mean) / std) };
+        }
+
+        /** Train a Logistic Regression via batch gradient descent. X: number[][], y: 0/1[] */
+        function trainLogisticRegression(X, y, { lr = 0.3, epochs = 3000 } = {}) {
+            const nSamples = X.length;
+            const nFeatures = X[0].length;
+            let weights = new Array(nFeatures).fill(0);
+            let bias = 0;
+
+            for (let epoch = 0; epoch < epochs; epoch++) {
+                const gradW = new Array(nFeatures).fill(0);
+                let gradB = 0;
+                for (let i = 0; i < nSamples; i++) {
+                    const z = X[i].reduce((s, v, j) => s + v * weights[j], 0) + bias;
+                    const pred = 1 / (1 + Math.exp(-z));
+                    const error = pred - y[i];
+                    for (let j = 0; j < nFeatures; j++) gradW[j] += error * X[i][j];
+                    gradB += error;
+                }
+                for (let j = 0; j < nFeatures; j++) weights[j] -= lr * gradW[j] / nSamples;
+                bias -= lr * gradB / nSamples;
+            }
+
+            // Training-set accuracy (in-sample only — n is small, no held-out validation set yet)
+            let correct = 0;
+            X.forEach((x, i) => {
+                const z = x.reduce((s, v, j) => s + v * weights[j], 0) + bias;
+                const label = (1 / (1 + Math.exp(-z))) >= 0.5 ? 1 : 0;
+                if (label === y[i]) correct++;
+            });
+            const accuracy = Math.round((correct / nSamples) * 1000) / 10;
+
+            return { weights, bias, accuracy };
+        }
+
+        /** Average quiz performance (%) for a given student across all chapters they've attempted; null if none yet. */
+        function computeQuizAverage(studentId) {
+            const record = quizBestScores[studentId];
+            if (!record) return null;
+            const chapterIds = Object.keys(record);
+            if (!chapterIds.length) return null;
+            let totalPct = 0;
+            chapterIds.forEach(cid => {
+                const chapter = quizChapters.find(c => c.id === Number(cid));
+                if (chapter) totalPct += (record[cid] / chapter.questions.length) * 100;
+            });
+            return Math.round((totalPct / chapterIds.length) * 10) / 10;
+        }
+
+        /**
+         * Quiz-average feature for ALL students, with mean-imputation for anyone who hasn't
+         * taken a quiz yet (imputed with the class average of students who HAVE attempted one,
+         * or a neutral 70 if nobody in the class has attempted any quiz yet).
+         */
+        function computeQuizFeatureData() {
+            const raw = rawStudentsData.map(s => computeQuizAverage(s.id));
+            const known = raw.filter(v => v !== null);
+            const classMean = known.length ? Math.round((known.reduce((a, b) => a + b, 0) / known.length) * 10) / 10 : 70;
+            const imputed = raw.map(v => (v === null ? classMean : v));
+            return { raw, imputed, classMean, attemptedCount: known.length, stats: standardize(imputed) };
+        }
+
+        /**
+         * Train the risk model on the current class's own data.
+         * Features: standardized attendance %, submission %, missing-assignment count,
+         * and quiz-review performance % (mean-imputed for students who haven't taken a quiz yet).
+         * Label: 1 if the student's CURRENT score is already below PASS_THRESHOLD.
+         * (Attendance/submission/missing/quiz are used as features rather than score itself,
+         * so the model is learning a genuine behavior -> outcome relationship instead of
+         * just echoing the score back.)
+         */
+        function trainRiskModel() {
+            const attStats = standardize(rawStudentsData.map(s => s.attendance));
+            const subStats = standardize(rawStudentsData.map(s => s.submission));
+            const missStats = standardize(rawStudentsData.map(s => s.missing));
+            const quizData = computeQuizFeatureData();
+
+            const X = rawStudentsData.map((s, i) => [attStats.z[i], subStats.z[i], missStats.z[i], quizData.stats.z[i]]);
+            const y = rawStudentsData.map(s => (s.score < PASS_THRESHOLD ? 1 : 0));
+
+            riskFeatureStats = { attendance: attStats, submission: subStats, missing: missStats, quiz: quizData.stats, quizClassMean: quizData.classMean };
+            riskModel = trainLogisticRegression(X, y);
+        }
+
+        /**
+         * Convert a 0-100 score into a Thai 8-level letter grade (สเกลมาตรฐานที่ใช้ทั่วไปในระดับอุดมศึกษาไทย)
+         * ปรับเกณฑ์ตัวเลขในฟังก์ชันนี้ได้ตามระเบียบการวัดผลของแต่ละสถาบัน
+         */
+        function getGrade(score) {
+            if (score >= 80) return { letter: "A",  gpa: 4.0, color: "#059669" };
+            if (score >= 75) return { letter: "B+", gpa: 3.5, color: "#10b981" };
+            if (score >= 70) return { letter: "B",  gpa: 3.0, color: "#3b82f6" };
+            if (score >= 65) return { letter: "C+", gpa: 2.5, color: "#2563eb" };
+            if (score >= 60) return { letter: "C",  gpa: 2.0, color: "#f59e0b" };
+            if (score >= 55) return { letter: "D+", gpa: 1.5, color: "#f97316" };
+            if (score >= 50) return { letter: "D",  gpa: 1.0, color: "#ea580c" };
+            return { letter: "F", gpa: 0.0, color: "#e11d48" };
+        }
+
+        function computePrediction(student) {
+            const avgCategoryWeight = 100 / 9; // 9 หัวข้อคะแนนหลัก
+            const recoverable = Math.round(student.missing * avgCategoryWeight * 0.7 * 10) / 10;
+            const predictedScore = Math.min(100, Math.round((student.score + recoverable) * 10) / 10);
+
+            // Risk probability from the trained Logistic Regression (trainRiskModel), not a hand-set formula.
+            const zAtt = (student.attendance - riskFeatureStats.attendance.mean) / riskFeatureStats.attendance.std;
+            const zSub = (student.submission - riskFeatureStats.submission.mean) / riskFeatureStats.submission.std;
+            const zMiss = (student.missing - riskFeatureStats.missing.mean) / riskFeatureStats.missing.std;
+            const quizVal = computeQuizAverage(student.id);
+            const quizForFeature = quizVal === null ? riskFeatureStats.quizClassMean : quizVal;
+            const zQuiz = (quizForFeature - riskFeatureStats.quiz.mean) / riskFeatureStats.quiz.std;
+
+            const z = riskModel.weights[0] * zAtt + riskModel.weights[1] * zSub + riskModel.weights[2] * zMiss + riskModel.weights[3] * zQuiz + riskModel.bias;
+            const riskProbability = Math.round((1 / (1 + Math.exp(-z))) * 1000) / 10; // %
+
+            let riskLabel, riskColor;
+            if (riskProbability >= 60) { riskLabel = "เสี่ยงสูง"; riskColor = "#e11d48"; }
+            else if (riskProbability >= 30) { riskLabel = "เฝ้าระวัง"; riskColor = "#2563eb"; }
+            else { riskLabel = "ความเสี่ยงต่ำ"; riskColor = "#059669"; }
+
+            return { predictedScore, recoverable, riskProbability, riskLabel, riskColor, quizAvg: quizVal };
+        }
+
+        /** Squared Euclidean distance between two equal-length feature vectors */
+        function sqDist(a, b) {
+            return a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0);
+        }
+
+        /** K-Means++ style seeding: spreads initial centroids apart instead of picking them by hand */
+        function kmeansPlusPlusInit(points, k) {
+            const centroids = [points[Math.floor(Math.random() * points.length)].slice()];
+            while (centroids.length < k) {
+                const dists = points.map(p => Math.min(...centroids.map(c => sqDist(p, c))));
+                const sum = dists.reduce((a, b) => a + b, 0);
+                let r = Math.random() * sum;
+                let idx = 0;
+                for (; idx < dists.length - 1; idx++) {
+                    r -= dists[idx];
+                    if (r <= 0) break;
+                }
+                centroids.push(points[idx].slice());
+            }
+            return centroids;
+        }
+
+        /** One full K-Means run to convergence; returns assignments, centroids, and inertia (for picking the best restart) */
+        function kmeansRun(points, k, maxIterations = 50) {
+            let centroids = kmeansPlusPlusInit(points, k);
+            let assignments = new Array(points.length).fill(0);
+
+            for (let iter = 0; iter < maxIterations; iter++) {
+                let changed = false;
+
+                points.forEach((p, idx) => {
+                    let minDist = Infinity, bestCluster = 0;
+                    centroids.forEach((c, cIdx) => {
+                        const dist = sqDist(p, c);
+                        if (dist < minDist) { minDist = dist; bestCluster = cIdx; }
+                    });
+                    if (assignments[idx] !== bestCluster) { assignments[idx] = bestCluster; changed = true; }
+                });
+
+                for (let cIdx = 0; cIdx < k; cIdx++) {
+                    const pts = points.filter((_, idx) => assignments[idx] === cIdx);
+                    if (pts.length > 0) {
+                        centroids[cIdx] = centroids[cIdx].map((_, d) => pts.reduce((s, p) => s + p[d], 0) / pts.length);
+                    }
+                }
+
+                if (!changed) break;
+            }
+
+            const inertia = points.reduce((s, p, i) => s + sqDist(p, centroids[assignments[i]]), 0);
+            return { assignments, centroids, inertia };
+        }
+
+        /** Mean silhouette score across all points — quick indicator of how well-separated the clusters are (-1 to 1, higher is better) */
+        function silhouetteScore(points, assignments, k) {
+            const n = points.length;
+            let total = 0;
+            for (let i = 0; i < n; i++) {
+                const ci = assignments[i];
+                const sameCluster = points.filter((_, j) => assignments[j] === ci && j !== i);
+                const a = sameCluster.length
+                    ? sameCluster.reduce((s, p) => s + Math.sqrt(sqDist(points[i], p)), 0) / sameCluster.length
+                    : 0;
+
+                let b = Infinity;
+                for (let c = 0; c < k; c++) {
+                    if (c === ci) continue;
+                    const otherCluster = points.filter((_, j) => assignments[j] === c);
+                    if (!otherCluster.length) continue;
+                    const avgDist = otherCluster.reduce((s, p) => s + Math.sqrt(sqDist(points[i], p)), 0) / otherCluster.length;
+                    if (avgDist < b) b = avgDist;
+                }
+
+                total += (a === 0 && b === Infinity) ? 0 : (b - a) / Math.max(a, b);
+            }
+            return total / n;
+        }
+
+        /**
+         * K-Means (K=3), clustering on ALL THREE standardized features (score, attendance, submission) —
+         * not just the two axes currently shown on the chart. Runs several K-Means++ restarts and keeps
+         * the lowest-inertia solution, then relabels clusters 0→2 by descending average score so the
+         * "High / Mid / At-risk" legend stays consistent regardless of which cluster K-Means found first.
+         */
+        function runKMeansClustering() {
+            const K = 3;
+            const scoreStd = standardize(rawStudentsData.map(s => s.score));
+            const attStd = standardize(rawStudentsData.map(s => s.attendance));
+            const subStd = standardize(rawStudentsData.map(s => s.submission));
+            const quizData = computeQuizFeatureData();
+
+            const points = rawStudentsData.map((s, i) => [scoreStd.z[i], attStd.z[i], subStd.z[i], quizData.stats.z[i]]);
+
+            let best = null;
+            for (let restart = 0; restart < 8; restart++) {
+                const result = kmeansRun(points, K);
+                if (!best || result.inertia < best.inertia) best = result;
+            }
+
+            // Relabel so cluster 0 = highest avg score ... cluster 2 = lowest, for stable colors/meaning
+            const avgScoreByCluster = [0, 1, 2].map(ci => {
+                const idxs = best.assignments.map((a, i) => (a === ci ? i : -1)).filter(i => i >= 0);
+                return idxs.length ? idxs.reduce((s, i) => s + rawStudentsData[i].score, 0) / idxs.length : -Infinity;
+            });
+            const order = [0, 1, 2].sort((a, b) => avgScoreByCluster[b] - avgScoreByCluster[a]);
+            const remap = {};
+            order.forEach((oldIdx, newIdx) => { remap[oldIdx] = newIdx; });
+            const assignments = best.assignments.map(a => remap[a]);
+
+            lastSilhouette = silhouetteScore(points, assignments, K);
+
+            processedStudents = rawStudentsData.map((s, i) => {
+                const yVal = currentYMetric === 'attendance' ? s.attendance : s.submission;
+                const pred = computePrediction(s);
+                const currentGrade = getGrade(s.score);
+                const predictedGrade = getGrade(pred.predictedScore);
+                return {
+                    ...s,
+                    xVal: s.score,
+                    yVal,
+                    cluster: assignments[i],
+                    predictedScore: pred.predictedScore,
+                    recoverable: pred.recoverable,
+                    riskProbability: pred.riskProbability,
+                    riskLabel: pred.riskLabel,
+                    riskColor: pred.riskColor,
+                    quizAvg: pred.quizAvg,
+                    currentGrade: currentGrade,
+                    predictedGrade: predictedGrade
+                };
+            });
+
+            // Centroids reported in real score/metric units (average of each cluster's actual students),
+            // so the star markers reflect the real 3-feature grouping, not an inverse-transformed blend.
+            clusterCentroids = [0, 1, 2].map(ci => {
+                const idxs = assignments.map((a, i) => (a === ci ? i : -1)).filter(i => i >= 0);
+                const xs = idxs.map(i => rawStudentsData[i].score);
+                const ys = idxs.map(i => (currentYMetric === 'attendance' ? rawStudentsData[i].attendance : rawStudentsData[i].submission));
+                return {
+                    cluster: ci,
+                    x: xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : 0,
+                    y: ys.length ? Math.round((ys.reduce((a, b) => a + b, 0) / ys.length) * 10) / 10 : 0
+                };
+            });
+
+            // Update the on-page quality badges now that we have fresh metrics
+            const qualityBadge = document.getElementById("clusterQualityBadge");
+            if (qualityBadge) {
+                const silhouetteText = lastSilhouette.toFixed(2);
+                const quality = lastSilhouette >= 0.5 ? "แยกกลุ่มได้ชัดเจน" : (lastSilhouette >= 0.25 ? "แยกกลุ่มได้พอใช้" : "กลุ่มค่อนข้างทับซ้อนกัน");
+                qualityBadge.innerHTML = `<i class="fa-solid fa-gauge-high mr-1"></i>Silhouette Score: ${silhouetteText} (${quality}) • โมเดลความเสี่ยง: Logistic Regression, Training Accuracy ${riskModel.accuracy}% • ทบทวนความรู้แล้ว ${quizData.attemptedCount}/${rawStudentsData.length} คน`;
+            }
+            const modalNote = document.getElementById("modalModelAccuracyNote");
+            if (modalNote) modalNote.innerText = `training accuracy ${riskModel.accuracy}%`;
+        }
+
+        /**
+         * Render the predictive risk ranking table, sorted by highest predicted risk first
+         */
+        function renderPredictionTable() {
+            const tbody = document.getElementById("predictionTableBody");
+            if (!tbody) return;
+
+            const sorted = [...processedStudents].sort((a, b) => b.riskProbability - a.riskProbability);
+
+            tbody.innerHTML = sorted.map(s => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40 cursor-pointer transition" onclick="openStudentModalById('${s.id}')">
+                    <td class="px-3 py-2 font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">${s.name}</td>
+                    <td class="px-3 py-2 text-center text-slate-600 dark:text-slate-300">${s.score.toFixed(2)}%</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style="background-color: ${s.currentGrade.color}">${s.currentGrade.letter}</span>
+                    </td>
+                    <td class="px-3 py-2 text-center text-sky-600 dark:text-sky-400 font-medium">${s.predictedScore}%</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style="background-color: ${s.predictedGrade.color}">${s.predictedGrade.letter}</span>
+                    </td>
+                    <td class="px-3 py-2 text-center font-semibold" style="color: ${s.riskColor}">${s.riskProbability}%</td>
+                    <td class="px-3 py-2 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style="background-color: ${s.riskColor}">${s.riskLabel}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        /**
+         * Recompute and refresh the top overview stat cards from the live data set
+         */
+        function updateStatCards() {
+            const total = rawStudentsData.length;
+            const avgScore = rawStudentsData.reduce((sum, s) => sum + s.score, 0) / total;
+            const avgAttendance = rawStudentsData.reduce((sum, s) => sum + s.attendance, 0) / total;
+            const avgGPA = rawStudentsData.reduce((sum, s) => sum + getGrade(s.score).gpa, 0) / total;
+
+            document.getElementById("statTotalStudents").innerText = total;
+            document.getElementById("statAvgScore").innerText = avgScore.toFixed(2) + "%";
+            document.getElementById("statAvgGPA").innerText = `GPA เฉลี่ย ${avgGPA.toFixed(2)}`;
+            document.getElementById("statAvgAttendance").innerText = avgAttendance.toFixed(1) + "%";
+
+            // At-risk = students grouped into the lowest-performing cluster (Cluster 2 by meta convention)
+            const atRiskCount = processedStudents.filter(s => s.cluster === 2).length;
+            document.getElementById("statAtRiskCount").innerText = atRiskCount + " คน";
+        }
+
+        /**
+         * Render SVG Scatter Plot canvas dynamically
+         */
+        function renderScatterPlot() {
+            const svg = document.getElementById('scatterSvg');
+            svg.innerHTML = ''; // Clear existing SVG contents
+
+            const width = 800;
+            const height = 480;
+            const padding = { top: 40, right: 40, bottom: 65, left: 65 };
+            const plotW = width - padding.left - padding.right;
+            const plotH = height - padding.top - padding.bottom;
+
+            // Coordinate limits
+            const xMin = 20, xMax = 100;
+            const yMin = 0, yMax = 100;
+
+            // Helper mapping functions
+            const getXPixel = (val) => padding.left + ((val - xMin) / (xMax - xMin)) * plotW;
+            const getYPixel = (val) => padding.top + plotH - ((val - yMin) / (yMax - yMin)) * plotH;
+
+            // SVG Namespace
+            const svgNS = "http://www.w3.org/2000/svg";
+
+            // 1. Draw Background Grid Lines & Ticks
+            const gridGroup = document.createElementNS(svgNS, "g");
+            gridGroup.setAttribute("class", "grid-lines");
+
+            // Vertical Gridlines (X Axis: Score)
+            for (let x = 20; x <= 100; x += 10) {
+                let px = getXPixel(x);
+                // Line
+                let line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", px);
+                line.setAttribute("y1", padding.top);
+                line.setAttribute("x2", px);
+                line.setAttribute("y2", padding.top + plotH);
+                line.setAttribute("stroke", "currentColor");
+                line.setAttribute("class", "text-slate-200 dark:text-slate-800");
+                line.setAttribute("stroke-dasharray", "3 3");
+                gridGroup.appendChild(line);
+
+                // Label
+                let text = document.createElementNS(svgNS, "text");
+                text.setAttribute("x", px);
+                text.setAttribute("y", padding.top + plotH + 20);
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("class", "text-[11px] fill-slate-400 dark:fill-slate-500 font-medium");
+                text.textContent = x + "%";
+                gridGroup.appendChild(text);
+            }
+
+            // Horizontal Gridlines (Y Axis: Attendance or Assignment)
+            for (let y = 0; y <= 100; y += 10) {
+                let py = getYPixel(y);
+                // Line
+                let line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", padding.left);
+                line.setAttribute("y1", py);
+                line.setAttribute("x2", padding.left + plotW);
+                line.setAttribute("y2", py);
+                line.setAttribute("stroke", "currentColor");
+                line.setAttribute("class", "text-slate-200 dark:text-slate-800");
+                line.setAttribute("stroke-dasharray", "3 3");
+                gridGroup.appendChild(line);
+
+                // Label
+                let text = document.createElementNS(svgNS, "text");
+                text.setAttribute("x", padding.left - 12);
+                text.setAttribute("y", py + 4);
+                text.setAttribute("text-anchor", "end");
+                text.setAttribute("class", "text-[11px] fill-slate-400 dark:fill-slate-500 font-medium");
+                text.textContent = y + "%";
+                gridGroup.appendChild(text);
+            }
+            svg.appendChild(gridGroup);
+
+            // 2. Draw Axes Lines & Titles
+            const axesGroup = document.createElementNS(svgNS, "g");
+
+            // Main X & Y axis solid border
+            let xAxisLine = document.createElementNS(svgNS, "line");
+            xAxisLine.setAttribute("x1", padding.left);
+            xAxisLine.setAttribute("y1", padding.top + plotH);
+            xAxisLine.setAttribute("x2", padding.left + plotW);
+            xAxisLine.setAttribute("y2", padding.top + plotH);
+            xAxisLine.setAttribute("class", "stroke-slate-300 dark:stroke-slate-600");
+            xAxisLine.setAttribute("stroke-width", "1.5");
+            axesGroup.appendChild(xAxisLine);
+
+            let yAxisLine = document.createElementNS(svgNS, "line");
+            yAxisLine.setAttribute("x1", padding.left);
+            yAxisLine.setAttribute("y1", padding.top);
+            yAxisLine.setAttribute("x2", padding.left);
+            yAxisLine.setAttribute("y2", padding.top + plotH);
+            yAxisLine.setAttribute("class", "stroke-slate-300 dark:stroke-slate-600");
+            yAxisLine.setAttribute("stroke-width", "1.5");
+            axesGroup.appendChild(yAxisLine);
+
+            // Axis Title: X
+            let xLabel = document.createElementNS(svgNS, "text");
+            xLabel.setAttribute("x", padding.left + plotW / 2);
+            xLabel.setAttribute("y", height - 15);
+            xLabel.setAttribute("text-anchor", "middle");
+            xLabel.setAttribute("class", "text-xs font-semibold fill-slate-700 dark:fill-slate-300");
+            xLabel.textContent = "คะแนนรวมวิชาทั้งหมด (%) [ Total Score ]";
+            axesGroup.appendChild(xLabel);
+
+            // Axis Title: Y
+            let yLabel = document.createElementNS(svgNS, "text");
+            yLabel.setAttribute("x", -(padding.top + plotH / 2));
+            yLabel.setAttribute("y", 18);
+            yLabel.setAttribute("transform", "rotate(-90)");
+            yLabel.setAttribute("text-anchor", "middle");
+            yLabel.setAttribute("class", "text-xs font-semibold fill-slate-700 dark:fill-slate-300");
+            yLabel.textContent = currentYMetric === 'attendance' ? "คะแนนการเข้าเรียน (%) [ Attendance Rate ]" : "อัตราการส่งงาน (%) [ Assignment Submission Rate ]";
+            axesGroup.appendChild(yLabel);
+
+            svg.appendChild(axesGroup);
+
+            // 3. Render Student Data Points
+            const pointsGroup = document.createElementNS(svgNS, "g");
+            pointsGroup.setAttribute("class", "data-points");
+
+            processedStudents.forEach((student) => {
+                const px = getXPixel(student.xVal);
+                const py = getYPixel(student.yVal);
+                const isDimmed = currentHighlightCluster !== null && student.cluster !== currentHighlightCluster;
+
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", px);
+                circle.setAttribute("cy", py);
+                circle.setAttribute("r", isDimmed ? "4" : "6.5");
+                circle.setAttribute("class", "dot-point");
+                
+                // Color fill per cluster
+                let colorHex = clusterMeta[student.cluster].color;
+                circle.setAttribute("fill", colorHex);
+                circle.setAttribute("stroke", "#ffffff");
+                circle.setAttribute("stroke-width", "1.5");
+                circle.setAttribute("opacity", isDimmed ? "0.2" : "0.9");
+
+                // Hover Tooltip Events
+                circle.addEventListener("mouseenter", (e) => showTooltip(e, student));
+                circle.addEventListener("mousemove", (e) => updateTooltipPos(e));
+                circle.addEventListener("mouseleave", () => hideTooltip());
+
+                // Click Event -> Open Modal
+                circle.addEventListener("click", () => openStudentModal(student));
+
+                pointsGroup.appendChild(circle);
+            });
+            svg.appendChild(pointsGroup);
+
+            // 4. Render Centroids (Star markers with halo)
+            const centroidsGroup = document.createElementNS(svgNS, "g");
+            centroidsGroup.setAttribute("class", "centroids-group");
+
+            clusterCentroids.forEach((c) => {
+                const px = getXPixel(c.x);
+                const py = getYPixel(c.y);
+                const colorHex = clusterMeta[c.cluster].color;
+                const isDimmed = currentHighlightCluster !== null && c.cluster !== currentHighlightCluster;
+
+                const cGroup = document.createElementNS(svgNS, "g");
+                cGroup.setAttribute("class", "centroid-marker");
+                cGroup.setAttribute("opacity", isDimmed ? "0.2" : "1");
+
+                // Pulse Halo
+                const halo = document.createElementNS(svgNS, "circle");
+                halo.setAttribute("cx", px);
+                halo.setAttribute("cy", py);
+                halo.setAttribute("r", "16");
+                halo.setAttribute("fill", colorHex);
+                halo.setAttribute("class", "pulse-halo");
+                cGroup.appendChild(halo);
+
+                // Outer Ring
+                const ring = document.createElementNS(svgNS, "circle");
+                ring.setAttribute("cx", px);
+                ring.setAttribute("cy", py);
+                ring.setAttribute("r", "11");
+                ring.setAttribute("fill", "#0f172a");
+                ring.setAttribute("stroke", colorHex);
+                ring.setAttribute("stroke-width", "2.5");
+                cGroup.appendChild(ring);
+
+                // Centroid Star Center Icon
+                const star = document.createElementNS(svgNS, "path");
+                // Star path coordinates centered at (px, py)
+                const pathD = drawStarPath(px, py, 5, 6, 3);
+                star.setAttribute("d", pathD);
+                star.setAttribute("fill", "#fbbf24"); // Amber star
+                cGroup.appendChild(star);
+
+                // Centroid Label Text
+                const label = document.createElementNS(svgNS, "text");
+                label.setAttribute("x", px);
+                label.setAttribute("y", py - 18);
+                label.setAttribute("text-anchor", "middle");
+                label.setAttribute("class", "text-[10px] font-bold fill-slate-800 dark:fill-slate-100 backdrop-blur");
+                label.textContent = `Centroid G${c.cluster + 1} (${c.x}%, ${c.y}%)`;
+                cGroup.appendChild(label);
+
+                centroidsGroup.appendChild(cGroup);
+            });
+
+            svg.appendChild(centroidsGroup);
+        }
+
+        // Helper to draw SVG Star Path
+        function drawStarPath(cx, cy, spikes, outerRadius, innerRadius) {
+            let rot = Math.PI / 2 * 3;
+            let x = cx;
+            let y = cy;
+            let step = Math.PI / spikes;
+            let path = "M " + cx + " " + (cy - outerRadius);
+
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerRadius;
+                y = cy + Math.sin(rot) * outerRadius;
+                path += " L " + x + " " + y;
+                rot += step;
+
+                x = cx + Math.cos(rot) * innerRadius;
+                y = cy + Math.sin(rot) * innerRadius;
+                path += " L " + x + " " + y;
+                rot += step;
+            }
+            path += " Z";
+            return path;
+        }
+
+        /**
+         * Show floating tooltip on scatter plot hover
+         */
+        function showTooltip(evt, student) {
+            const tooltip = document.getElementById("scatterTooltip");
+            const meta = clusterMeta[student.cluster];
+            
+            tooltip.innerHTML = `
+                <div class="flex items-center justify-between pb-1.5 border-b border-slate-700/60 mb-2">
+                    <span class="font-bold text-sm text-white">${student.name}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold" style="background-color: ${meta.color}; color: #fff;">
+                        ${meta.shortName}
+                    </span>
+                </div>
+                <div class="space-y-1 text-slate-300">
+                    <p class="flex justify-between"><span>รหัสนักเรียน:</span> <strong class="text-white">${student.id}</strong></p>
+                    <p class="flex justify-between"><span>คะแนนรวม (%):</span> <strong class="text-emerald-400">${student.score}%</strong></p>
+                    <p class="flex justify-between"><span>อัตราเข้าเรียน:</span> <strong class="text-sky-400">${student.attendance}%</strong></p>
+                    <p class="flex justify-between"><span>อัตราการส่งงาน:</span> <strong class="text-indigo-400">${student.submission}%</strong></p>
+                    <p class="flex justify-between"><span>งานค้างส่ง:</span> <strong class="${student.missing > 3 ? 'text-rose-400 font-bold' : 'text-slate-200'}">${student.missing} ชิ้น</strong></p>
+                </div>
+                <div class="mt-2 text-[10px] text-sky-400 text-center font-medium">
+                    <i class="fa-solid fa-hand-pointer mr-1"></i> คลิกเพื่อเปิดดูใบบันทึกรายงานส่วนตัว
+                </div>
+            `;
+
+            tooltip.classList.remove("hidden");
+            updateTooltipPos(evt);
+        }
+
+        function updateTooltipPos(evt) {
+            const tooltip = document.getElementById("scatterTooltip");
+            const container = tooltip.parentElement.getBoundingClientRect();
+            
+            // Calculate relative coordinates inside parent container
+            let x = evt.clientX - container.left;
+            let y = evt.clientY - container.top;
+
+            tooltip.style.left = `${x}px`;
+            tooltip.style.top = `${y}px`;
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById("scatterTooltip");
+            tooltip.classList.add("hidden");
+        }
+
+        /**
+         * Switch Y-Axis Metric (Attendance vs Assignment Submission Rate)
+         */
+        function setYAxisMetric(metric) {
+            currentYMetric = metric;
+
+            const btnAtt = document.getElementById("yAxisBtnAttendance");
+            const btnAss = document.getElementById("yAxisBtnAssignments");
+
+            if (metric === 'attendance') {
+                btnAtt.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-600";
+                btnAss.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+            } else {
+                btnAss.className = "px-3 py-1.5 text-xs font-medium rounded-lg transition-all shadow-sm bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 border border-slate-200 dark:border-slate-600";
+                btnAtt.className = "px-3 py-1.5 text-xs font-medium rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+            }
+
+            // Recalculate K-Means and update display
+            runKMeansClustering();
+            renderScatterPlot();
+            renderClusterCards();
+            renderPredictionTable();
+            updateStatCards();
+            showToast(`เปลี่ยนมุมมองแกน Y เป็น "${metric === 'attendance' ? 'คะแนนเข้าเรียน' : 'อัตราการส่งงาน'}" เรียบร้อยแล้ว`);
+        }
+
+        /**
+         * Highlight specific cluster on scatter plot
+         */
+        function highlightCluster(clusterId) {
+            if (currentHighlightCluster === clusterId) {
+                currentHighlightCluster = null;
+            } else {
+                currentHighlightCluster = clusterId;
+            }
+            renderScatterPlot();
+            renderClusterCards();
+        }
+
+        function resetPlotHighlight() {
+            currentHighlightCluster = null;
+            renderScatterPlot();
+            renderClusterCards();
+        }
+
+        /**
+         * Render bottom summary cluster cards with student list
+         */
+        function renderClusterCards() {
+            const container = document.getElementById("clusterCardsContainer");
+            container.innerHTML = "";
+
+            [0, 1, 2].forEach((cId) => {
+                const meta = clusterMeta[cId];
+                const list = processedStudents.filter(s => s.cluster === cId);
+                const isSelected = currentHighlightCluster === cId;
+
+                // Calculate average metrics
+                const avgScore = list.length ? (list.reduce((acc, s) => acc + s.score, 0) / list.length).toFixed(1) : 0;
+                const avgAtt = list.length ? (list.reduce((acc, s) => acc + s.attendance, 0) / list.length).toFixed(1) : 0;
+                const avgSub = list.length ? (list.reduce((acc, s) => acc + s.submission, 0) / list.length).toFixed(1) : 0;
+
+                const cardHtml = `
+                    <div class="bg-white dark:bg-slate-800 rounded-2xl border ${isSelected ? meta.badgeBorder + ' ring-2 ring-sky-500/30' : 'border-slate-200/80 dark:border-slate-700/80'} p-5 shadow-sm space-y-4 hover:shadow-md transition-all flex flex-col justify-between">
+                        <div>
+                            <!-- Header Title -->
+                            <div class="flex items-center justify-between">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-bold border ${meta.bgBadge} flex items-center gap-1.5">
+                                    <i class="fa-solid ${meta.icon}"></i> ${meta.shortName}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    ${list.length} คน (${Math.round((list.length/processedStudents.length)*100)}%)
+                                </span>
+                            </div>
+
+                            <!-- Metrics Strip -->
+                            <div class="grid grid-cols-3 gap-2 mt-4 text-center bg-slate-50 dark:bg-slate-700/30 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700">
+                                <div>
+                                    <p class="text-[10px] text-slate-400">คะแนนเฉลี่ย</p>
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${avgScore}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-400">เข้าเรียนเฉลี่ย</p>
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${avgAtt}%</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] text-slate-400">ส่งงานเฉลี่ย</p>
+                                    <p class="text-sm font-bold text-slate-800 dark:text-slate-100">${avgSub}%</p>
+                                </div>
+                            </div>
+
+                            <!-- Behavior Description & Advice -->
+                            <div class="mt-3 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                                <p class="leading-relaxed"><strong class="text-slate-700 dark:text-slate-200">ลักษณะพฤติกรรม:</strong> ${meta.desc}</p>
+                                <p class="leading-relaxed text-slate-500 dark:text-slate-400 bg-amber-500/5 p-2 rounded-lg border border-amber-500/10">
+                                    <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i><strong>คำแนะนำ:</strong> ${meta.advice}
+                                </p>
+                            </div>
+
+                            <!-- Student Avatars & Names List -->
+                            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/70">
+                                <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2">รายชื่อนักเรียนในกลุ่มนี้:</p>
+                                <div class="max-h-40 overflow-y-auto pr-1 space-y-1.5">
+                                    ${list.map(s => `
+                                        <div onclick="openStudentModalById('${s.id}')" 
+                                             class="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/60 cursor-pointer transition text-xs">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-6 h-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center shadow-xs" style="background-color: ${meta.color}">
+                                                    ${s.name.charAt(0)}
+                                                </div>
+                                                <span class="font-medium text-slate-700 dark:text-slate-200">${s.name}</span>
+                                            </div>
+                                            <span class="text-[10px] text-slate-400 font-mono">${s.score}% | ${s.missing} งาน</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card Action -->
+                        <div class="mt-4 pt-2">
+                            <button onclick="highlightCluster(${cId})" 
+                                class="w-full py-1.5 px-3 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-filter"></i>
+                                <span>${isSelected ? 'ยกเลิกการกรองเน้นจุด' : 'เน้นจุดเฉพาะกลุ่มนี้บนแผนภูมิ'}</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        /**
+         * Open Individual Student Modal
+         */
+        function openStudentModal(student) {
+            const modal = document.getElementById("studentModal");
+            const modalCard = document.getElementById("modalCard");
+            const meta = clusterMeta[student.cluster];
+
+            // Populate Student Data
+            document.getElementById("modalStudentName").innerText = student.name;
+            document.getElementById("modalStudentID").innerText = `รหัสนักเรียน: ${student.id}`;
+            document.getElementById("modalTotalScore").innerText = `${student.score}%`;
+            document.getElementById("modalAttendance").innerText = `${student.attendance}%`;
+            document.getElementById("modalAssignments").innerText = `${student.submission}%`;
+            const quizAvgEl = document.getElementById("modalQuizAvg");
+            quizAvgEl.innerText = student.quizAvg !== null && student.quizAvg !== undefined ? `${student.quizAvg}%` : "ยังไม่ทำ";
+
+            // Track which student this modal is currently showing, for the "ทบทวนความรู้" shortcut button
+            window.currentModalStudentId = student.id;
+
+            // Avatar
+            const avatar = document.getElementById("modalStudentAvatar");
+            avatar.innerText = student.name.charAt(0);
+            avatar.style.backgroundColor = meta.color;
+
+            // Cluster Badge
+            const badge = document.getElementById("modalStudentClusterBadge");
+            badge.innerText = meta.shortName;
+            badge.className = `text-xs px-2.5 py-0.5 rounded-full font-semibold text-white`;
+            badge.style.backgroundColor = meta.color;
+
+            // Missing assignments alert status
+            const missingBox = document.getElementById("modalMissingBox");
+            const missingText = document.getElementById("modalMissingText");
+            const missingStatus = document.getElementById("modalMissingStatus");
+
+            missingText.innerText = `งานค้างส่งสะสม: ${student.missing} ชิ้น`;
+
+            if (student.missing === 0) {
+                missingBox.className = "p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-xs font-medium";
+                missingStatus.innerText = "ส่งงานครบถ้วนสมบูรณ์";
+            } else if (student.missing <= 2) {
+                missingBox.className = "p-3.5 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs font-medium";
+                missingStatus.innerText = "ตกค้างเล็กน้อย";
+            } else {
+                missingBox.className = "p-3.5 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 text-xs font-medium";
+                missingStatus.innerText = "ต้องตามงานด่วน";
+            }
+
+            // Recommendation Text
+            document.getElementById("modalRecommendation").innerText = meta.advice;
+
+            // Prediction fields
+            document.getElementById("modalPredictedScore").innerText = `${student.predictedScore}%`;
+            const riskEl = document.getElementById("modalRiskProbability");
+            riskEl.innerText = `${student.riskProbability}% (${student.riskLabel})`;
+            riskEl.style.color = student.riskColor;
+
+            // Grade badges
+            const gradeBadge = document.getElementById("modalGradeBadge");
+            gradeBadge.innerText = `เกรด ${student.currentGrade.letter} (${student.currentGrade.gpa.toFixed(2)})`;
+            gradeBadge.style.backgroundColor = student.currentGrade.color;
+
+            const predGradeBadge = document.getElementById("modalPredictedGradeBadge");
+            predGradeBadge.innerText = `เกรด ${student.predictedGrade.letter} (${student.predictedGrade.gpa.toFixed(2)})`;
+            predGradeBadge.style.backgroundColor = student.predictedGrade.color;
+
+            // Display Modal with animation
+            modal.classList.remove("hidden");
+            setTimeout(() => {
+                modalCard.classList.remove("scale-95", "opacity-0");
+                modalCard.classList.add("scale-100", "opacity-100");
+            }, 10);
+        }
+
+        function openStudentModalById(id) {
+            const student = processedStudents.find(s => s.id === id);
+            if (student) {
+                openStudentModal(student);
+            }
+        }
+
+        function closeStudentModal() {
+            const modal = document.getElementById("studentModal");
+            const modalCard = document.getElementById("modalCard");
+
+            modalCard.classList.remove("scale-100", "opacity-100");
+            modalCard.classList.add("scale-95", "opacity-0");
+
+            setTimeout(() => {
+                modal.classList.add("hidden");
+            }, 200);
+        }
+
+        /**
+         * Search filter students by name
+         */
+        function filterStudentsByName() {
+            const query = document.getElementById("studentSearchInput").value.toLowerCase().trim();
+            if (!query) {
+                currentHighlightCluster = null;
+                renderScatterPlot();
+                return;
+            }
+
+            const matched = processedStudents.find(s => s.name.toLowerCase().includes(query));
+            if (matched) {
+                showToast(`พบข้อมูล: ${matched.name} (${clusterMeta[matched.cluster].shortName})`);
+            }
+        }
+
+        /**
+         * Dark/Light mode theme toggle
+         */
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains("dark")) {
+                html.classList.remove("dark");
+                localStorage.setItem("theme", "light");
+                showToast("เปลี่ยนเป็นโหมดสว่าง (Light Mode)");
+            } else {
+                html.classList.add("dark");
+                localStorage.setItem("theme", "dark");
+                showToast("เปลี่ยนเป็นโหมดมืด (Dark Mode)");
+            }
+        }
+
+        /**
+         * Toast message helper
+         */
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toastMsg");
+            toastMsg.innerText = message;
+            toast.classList.remove("hidden");
+            toast.classList.add("flex");
+
+            setTimeout(() => {
+                toast.classList.add("hidden");
+                toast.classList.remove("flex");
+            }, 2800);
+        }
+
+        function alertAction(msg) {
+            showToast(msg);
+        }
+
+        function exportData() {
+            showToast("ระบบกำลังจัดทำไฟล์รายงาน CSV สำหรับส่งออก...");
+        }
+
+        /* ============================================================
+         * Chapter Knowledge Review (Quiz)
+         * Short self-check quizzes per lesson chapter. Best score per
+         * chapter is remembered in this browser (localStorage), with
+         * safe fallbacks if storage is unavailable.
+         * ============================================================ */
+        const quizChapters = [
+            {
+                id: 1,
+                title: "บทที่ 1: เทคโนโลยีการศึกษาเบื้องต้น",
+                icon: "fa-graduation-cap",
+                color: "#0ea5e9",
+                questions: [
+                    {
+                        prompt: "เทคโนโลยีการศึกษา (Educational Technology) หมายถึงอะไร?",
+                        options: [
+                            "การใช้เครื่องมือดิจิทัลในการสอนเท่านั้น",
+                            "การประยุกต์ทฤษฎีและแนวปฏิบัติอย่างเป็นระบบเพื่อพัฒนาการเรียนรู้",
+                            "วิชาที่สอนเฉพาะการเขียนโปรแกรมคอมพิวเตอร์",
+                            "การจัดซื้ออุปกรณ์คอมพิวเตอร์ให้โรงเรียน"
+                        ],
+                        correct: 1,
+                        explanation: "เทคโนโลยีการศึกษาครอบคลุมทั้งกระบวนการ ทฤษฎี วิธีการ และเครื่องมือ ไม่ใช่แค่อุปกรณ์ดิจิทัลเพียงอย่างเดียว"
+                    },
+                    {
+                        prompt: "ขั้นตอนใดต่อไปนี้ไม่ได้อยู่ใน ADDIE Model (แบบจำลองการออกแบบการเรียนการสอน)?",
+                        options: ["Analysis (วิเคราะห์)", "Design (ออกแบบ)", "Automation (การทำให้เป็นอัตโนมัติ)", "Evaluation (ประเมินผล)"],
+                        correct: 2,
+                        explanation: "ADDIE ย่อมาจาก Analysis, Design, Development, Implementation, Evaluation — ไม่มีขั้นตอน Automation"
+                    },
+                    {
+                        prompt: "การเรียนแบบ Synchronous ต่างจาก Asynchronous อย่างไร?",
+                        options: [
+                            "Synchronous คือเรียนพร้อมกันแบบ real-time ส่วน Asynchronous ผู้เรียนเข้าถึงได้ตามเวลาของตนเอง",
+                            "ทั้งสองแบบเหมือนกันทุกประการ",
+                            "Asynchronous ต้องเรียนพร้อมกันในห้องเสมอ",
+                            "Synchronous ใช้ได้เฉพาะกับวิชาคณิตศาสตร์"
+                        ],
+                        correct: 0,
+                        explanation: "Synchronous เกิดขึ้นพร้อมกันตามเวลาจริง เช่น การประชุมทางไกลสด ส่วน Asynchronous ผู้เรียนสามารถเข้าถึงเนื้อหาได้ตามความสะดวก"
+                    },
+                    {
+                        prompt: "LMS ที่ใช้ในการจัดการเรียนการสอนออนไลน์ ย่อมาจากอะไร?",
+                        options: ["Learning Management System", "Local Media Server", "Language Model System", "Live Meeting Software"],
+                        correct: 0,
+                        explanation: "LMS ย่อมาจาก Learning Management System ซึ่งเป็นระบบจัดการรายวิชา เนื้อหา และการติดตามความก้าวหน้าของผู้เรียน"
+                    }
+                ],
+                foundation: {
+                    concept: "นิยามพื้นฐานของเทคโนโลยีการศึกษา",
+                    drills: [
+                        {
+                            prompt: "ข้อใดคือความหมายที่ถูกต้องที่สุดของ 'เทคโนโลยี' ในบริบทการศึกษา?",
+                            options: ["กระบวนการและเครื่องมือที่นำมาใช้แก้ปัญหาการเรียนรู้อย่างเป็นระบบ", "คอมพิวเตอร์เท่านั้น", "อินเทอร์เน็ตเท่านั้น", "ซอฟต์แวร์ราคาแพง"],
+                            correct: 0,
+                            explanation: "เทคโนโลยีการศึกษาคือกระบวนการและเครื่องมือที่นำมาใช้อย่างเป็นระบบเพื่อพัฒนาการเรียนรู้ ไม่ใช่แค่อุปกรณ์ดิจิทัล"
+                        },
+                        {
+                            prompt: "ระบบที่ใช้จัดการเนื้อหาบทเรียนออนไลน์ เก็บคะแนน และติดตามความก้าวหน้าของผู้เรียน เรียกว่าอะไร?",
+                            options: ["LMS", "CPU", "URL", "PDF"],
+                            correct: 0,
+                            explanation: "LMS (Learning Management System) คือระบบที่ใช้จัดการรายวิชา เนื้อหา และติดตามความก้าวหน้าของผู้เรียน"
+                        }
+                    ]
+                }
+            },
+            {
+                id: 2,
+                title: "บทที่ 2: ทฤษฎีการเรียนรู้กับเทคโนโลยี",
+                icon: "fa-brain",
+                color: "#6366f1",
+                questions: [
+                    {
+                        prompt: "ทฤษฎี Constructivism เน้นเรื่องใดเป็นหลัก?",
+                        options: [
+                            "ผู้เรียนสร้างความรู้ด้วยตนเองจากประสบการณ์",
+                            "การท่องจำเนื้อหาตามลำดับ",
+                            "การเสริมแรงทางบวกเพียงอย่างเดียว",
+                            "การเรียนโดยไม่มีปฏิสัมพันธ์กับสิ่งแวดล้อม"
+                        ],
+                        correct: 0,
+                        explanation: "Constructivism เชื่อว่าผู้เรียนสร้าง (construct) ความรู้ด้วยตนเองผ่านประสบการณ์และการลงมือปฏิบัติ"
+                    },
+                    {
+                        prompt: "ทฤษฎี Behaviorism เน้นกลไกใดในการปรับพฤติกรรมการเรียนรู้?",
+                        options: ["การจินตนาการอย่างอิสระ", "การเสริมแรง (Reinforcement)", "การสร้างสังคมออนไลน์", "การใช้เกมเพียงอย่างเดียว"],
+                        correct: 1,
+                        explanation: "Behaviorism เน้นการใช้การเสริมแรง (reinforcement) เพื่อกระตุ้นหรือปรับพฤติกรรมของผู้เรียน"
+                    },
+                    {
+                        prompt: "Scaffolding ในทฤษฎีของ Vygotsky หมายถึงอะไร?",
+                        options: [
+                            "การปล่อยให้ผู้เรียนเรียนรู้ด้วยตนเองทั้งหมดโดยไม่มีความช่วยเหลือ",
+                            "การให้ความช่วยเหลือผู้เรียนตามระดับที่เหมาะสม แล้วค่อยๆ ลดลงเมื่อผู้เรียนทำได้เอง",
+                            "การทดสอบวัดผลปลายภาค",
+                            "การให้รางวัลเมื่อทำคะแนนได้สูง"
+                        ],
+                        correct: 1,
+                        explanation: "Scaffolding คือการค่อยๆ ให้ความช่วยเหลือที่เหมาะสมกับระดับผู้เรียน แล้วลดความช่วยเหลือลงเมื่อผู้เรียนมีความสามารถมากขึ้น"
+                    },
+                    {
+                        prompt: "Zone of Proximal Development (ZPD) หมายถึงอะไร?",
+                        options: [
+                            "ช่วงเวลาที่ผู้เรียนต้องพักผ่อน",
+                            "ช่วงความสามารถระหว่างสิ่งที่ผู้เรียนทำได้เองกับสิ่งที่ทำได้เมื่อมีผู้ช่วยเหลือ",
+                            "พื้นที่ทางกายภาพของห้องเรียน",
+                            "ระยะเวลาที่ใช้สอบ"
+                        ],
+                        correct: 1,
+                        explanation: "ZPD คือช่วงความสามารถที่ผู้เรียนยังทำเองไม่ได้ แต่ทำได้เมื่อมีผู้ใหญ่หรือเพื่อนที่มีความสามารถสูงกว่าช่วยเหลือ"
+                    }
+                ],
+                foundation: {
+                    concept: "ความหมายพื้นฐานของทฤษฎีการเรียนรู้",
+                    drills: [
+                        {
+                            prompt: "ทฤษฎีการเรียนรู้ (Learning Theory) มีไว้เพื่ออะไร?",
+                            options: ["อธิบายว่ามนุษย์เรียนรู้ได้อย่างไร", "กำหนดตารางสอบ", "ออกแบบอาคารเรียน", "คำนวณค่าเทอม"],
+                            correct: 0,
+                            explanation: "ทฤษฎีการเรียนรู้มีไว้เพื่ออธิบายกระบวนการที่มนุษย์รับและสร้างความรู้ ซึ่งเป็นพื้นฐานของการออกแบบการสอน"
+                        },
+                        {
+                            prompt: "แนวคิด 'ผู้เรียนเป็นศูนย์กลาง' (Learner-centered) เกี่ยวข้องกับสิ่งใดมากที่สุด?",
+                            options: ["ให้ผู้เรียนมีส่วนร่วมและลงมือสร้างความเข้าใจเอง", "ให้ครูพูดคนเดียวตลอดคาบ", "ยกเลิกการบ้านทั้งหมด", "ใช้หนังสือเรียนเล่มเดียวเท่านั้น"],
+                            correct: 0,
+                            explanation: "แนวคิดผู้เรียนเป็นศูนย์กลางเน้นให้ผู้เรียนมีบทบาทและลงมือสร้างความเข้าใจด้วยตนเอง สอดคล้องกับแนวคิด Constructivism"
+                        }
+                    ]
+                }
+            },
+            {
+                id: 3,
+                title: "บทที่ 3: Gamification และองค์ประกอบของเกม",
+                icon: "fa-gamepad",
+                color: "#f59e0b",
+                questions: [
+                    {
+                        prompt: "Gamification คืออะไร?",
+                        options: [
+                            "การสร้างวิดีโอเกมเพื่อขาย",
+                            "การนำกลไกและองค์ประกอบของเกมมาใช้ในบริบทที่ไม่ใช่เกม เพื่อสร้างแรงจูงใจ",
+                            "การห้ามใช้เกมในห้องเรียน",
+                            "การแข่งขันกีฬาระหว่างโรงเรียน"
+                        ],
+                        correct: 1,
+                        explanation: "Gamification คือการนำองค์ประกอบของเกม เช่น คะแนน ตรารางวัล มาใช้ในบริบทอื่นๆ (เช่นการเรียนการสอน) เพื่อกระตุ้นแรงจูงใจ"
+                    },
+                    {
+                        prompt: "ข้อใดไม่ใช่กลไกพื้นฐาน (Game Mechanics) ที่พบทั่วไปในระบบ Gamification?",
+                        options: ["Points (คะแนนสะสม)", "Badges (ตรารางวัล)", "Leaderboard (กระดานผู้นำ)", "Textbook (หนังสือเรียน)"],
+                        correct: 3,
+                        explanation: "Points, Badges และ Leaderboard เป็นกลไกเกมที่ใช้บ่อย ส่วนหนังสือเรียนเป็นสื่อการสอนทั่วไป ไม่ใช่กลไกของเกม"
+                    },
+                    {
+                        prompt: "PBL (Points, Badges, Leaderboards) ในบริบท Gamification หมายถึงอะไร?",
+                        options: [
+                            "วิธีการสอนแบบ Problem-Based Learning",
+                            "กลไกพื้นฐาน 3 อย่างที่นิยมใช้ในการออกแบบระบบเกมมิฟิเคชัน",
+                            "ชื่อของแพลตฟอร์ม LMS",
+                            "ทฤษฎีการเรียนรู้แบบ Behaviorism"
+                        ],
+                        correct: 1,
+                        explanation: "PBL ในบริบทนี้ย่อมาจาก Points, Badges, Leaderboards ซึ่งเป็น 3 กลไกพื้นฐานที่นิยมใช้ในการออกแบบ Gamification"
+                    },
+                    {
+                        prompt: "ความเสี่ยงหนึ่งของการใช้ Gamification มากเกินไปคืออะไร?",
+                        options: [
+                            "ผู้เรียนอาจสนใจรางวัล (extrinsic motivation) มากกว่าเนื้อหาการเรียนรู้จริง",
+                            "ทำให้ผู้เรียนเบื่อหน่ายทันทีเสมอ",
+                            "ไม่สามารถนำไปใช้กับการเรียนออนไลน์ได้",
+                            "ต้องใช้งบประมาณสูงกว่าการสอนแบบปกติเสมอ"
+                        ],
+                        correct: 0,
+                        explanation: "หากออกแบบไม่สมดุล ผู้เรียนอาจให้ความสำคัญกับรางวัลภายนอก (extrinsic) มากกว่าแรงจูงใจภายใน (intrinsic) ในการเรียนรู้เนื้อหาจริง"
+                    }
+                ],
+                foundation: {
+                    concept: "องค์ประกอบพื้นฐานของเกม",
+                    drills: [
+                        {
+                            prompt: "ข้อใดคือตัวอย่างของ 'กลไกเกม' ที่นิยมนำมาใช้กระตุ้นแรงจูงใจในการเรียน?",
+                            options: ["ตรารางวัล / แต้มสะสม", "ใบลงทะเบียนเรียน", "ตารางสอน", "ใบเซ็นชื่อเข้าเรียน"],
+                            correct: 0,
+                            explanation: "ตรารางวัลและแต้มสะสมเป็นกลไกเกม (Game Mechanics) พื้นฐานที่ใช้กระตุ้นแรงจูงใจในระบบ Gamification"
+                        },
+                        {
+                            prompt: "เป้าหมายหลักของการนำกลไกเกมมาใช้ในห้องเรียนคืออะไร?",
+                            options: ["เพิ่มแรงจูงใจในการมีส่วนร่วมของผู้เรียน", "แทนที่การสอบทั้งหมด", "ลดจำนวนนักเรียนในห้อง", "เพิ่มค่าใช้จ่ายอุปกรณ์"],
+                            correct: 0,
+                            explanation: "Gamification มีเป้าหมายหลักเพื่อเพิ่มแรงจูงใจและการมีส่วนร่วมของผู้เรียน ไม่ใช่เพื่อทดแทนการวัดผลหรือเพิ่มต้นทุน"
+                        }
+                    ]
+                }
+            },
+            {
+                id: 4,
+                title: "บทที่ 4: การออกแบบสื่อการเรียนรู้ดิจิทัล",
+                icon: "fa-laptop-code",
+                color: "#10b981",
+                questions: [
+                    {
+                        prompt: "หลักการ Multimedia Learning ของ Mayer แนะนำให้หลีกเลี่ยงสิ่งใด (Redundancy Principle)?",
+                        options: [
+                            "การใส่ข้อความบรรยายซ้ำกับเสียงบรรยายที่พูดเนื้อหาเดียวกันพร้อมกัน",
+                            "การใช้ภาพประกอบเนื้อหา",
+                            "การแบ่งเนื้อหาเป็นส่วนย่อย",
+                            "การให้ผู้เรียนควบคุมความเร็วในการเรียนเอง"
+                        ],
+                        correct: 0,
+                        explanation: "Redundancy Principle แนะนำให้หลีกเลี่ยงการแสดงข้อความที่ซ้ำกับเสียงบรรยายพร้อมกัน เพราะอาจทำให้ผู้เรียนรับข้อมูลเกินความจำเป็น"
+                    },
+                    {
+                        prompt: "Microlearning เหมาะกับสถานการณ์ใดมากที่สุด?",
+                        options: [
+                            "เนื้อหาที่ต้องใช้เวลาเรียนต่อเนื่อง 3 ชั่วโมง",
+                            "เนื้อหาสั้น กระชับ เรียนจบได้ในเวลาไม่กี่นาที",
+                            "การสอบปลายภาคแบบเข้มข้น",
+                            "การฝึกงานภาคสนามระยะยาว"
+                        ],
+                        correct: 1,
+                        explanation: "Microlearning เน้นเนื้อหาสั้น กระชับ ผู้เรียนสามารถเรียนรู้ได้ในเวลาสั้นๆ เช่น 3-5 นาทีต่อครั้ง"
+                    },
+                    {
+                        prompt: "Infographic ในสื่อการเรียนรู้มีจุดเด่นด้านใด?",
+                        options: [
+                            "สรุปข้อมูลที่ซับซ้อนให้เข้าใจง่ายด้วยภาพ",
+                            "ใช้แทนการบรรยายเสียงได้ทุกกรณี",
+                            "เหมาะกับเนื้อหาที่เป็นตัวเลขเท่านั้น",
+                            "ไม่สามารถใช้บนอุปกรณ์เคลื่อนที่ได้"
+                        ],
+                        correct: 0,
+                        explanation: "Infographic ช่วยสรุปข้อมูลหรือแนวคิดที่ซับซ้อนให้เข้าใจง่ายขึ้นผ่านการนำเสนอด้วยภาพ"
+                    },
+                    {
+                        prompt: "การออกแบบ UX/UI ที่ดีสำหรับสื่อการเรียนรู้ควรคำนึงถึงอะไรเป็นหลัก?",
+                        options: [
+                            "ความสวยงามเพียงอย่างเดียวโดยไม่สนใจการใช้งาน",
+                            "ความง่ายในการใช้งานและการเข้าถึงของผู้เรียน (Usability & Accessibility)",
+                            "จำนวนสีที่ใช้ในหน้าจอ",
+                            "ขนาดไฟล์ที่ใหญ่ที่สุดเท่าที่เป็นไปได้"
+                        ],
+                        correct: 1,
+                        explanation: "หลักการออกแบบ UX/UI ที่ดีเน้นที่ความง่ายในการใช้งานและการเข้าถึงได้ของผู้เรียนทุกกลุ่มเป็นสำคัญ"
+                    }
+                ],
+                foundation: {
+                    concept: "หลักการพื้นฐานของสื่อการเรียนรู้ที่ดี",
+                    drills: [
+                        {
+                            prompt: "สื่อการเรียนรู้ที่ดีควรมีลักษณะอย่างไรเป็นอันดับแรก?",
+                            options: ["เข้าใจง่ายและตรงกับเป้าหมายการเรียนรู้", "มีเอฟเฟกต์เยอะที่สุด", "ไฟล์มีขนาดใหญ่ที่สุด", "ใช้สีสันจัดจ้านที่สุด"],
+                            correct: 0,
+                            explanation: "หลักการออกแบบสื่อที่ดีเน้นความเข้าใจง่ายและตรงกับวัตถุประสงค์การเรียนรู้เป็นอันดับแรก ไม่ใช่ความหวือหวา"
+                        },
+                        {
+                            prompt: "เหตุใดจึงควรแบ่งเนื้อหาบทเรียนออกเป็นส่วนย่อยๆ (Chunking)?",
+                            options: ["ช่วยให้ผู้เรียนไม่รับข้อมูลมากเกินไปในคราวเดียว", "เพื่อให้ไฟล์มีจำนวนมากขึ้น", "เพื่อให้ดูซับซ้อนขึ้น", "ไม่มีเหตุผลพิเศษ"],
+                            correct: 0,
+                            explanation: "การแบ่งเนื้อหาเป็นส่วนย่อย (Chunking) ช่วยลดภาระทางปัญญา (Cognitive Load) ทำให้ผู้เรียนไม่รับข้อมูลมากเกินไปในคราวเดียว"
+                        }
+                    ]
+                }
+            },
+            {
+                id: 5,
+                title: "บทที่ 5: การวัดและประเมินผลด้วยเทคโนโลยี",
+                icon: "fa-clipboard-check",
+                color: "#e11d48",
+                questions: [
+                    {
+                        prompt: "Formative Assessment ต่างจาก Summative Assessment อย่างไร?",
+                        options: [
+                            "Formative ใช้ระหว่างการเรียนเพื่อปรับปรุง ส่วน Summative ใช้สรุปผลเมื่อจบบทเรียน/รายวิชา",
+                            "ทั้งสองแบบใช้แทนกันได้เสมอ",
+                            "Summative ใช้ก่อนเริ่มเรียนเท่านั้น",
+                            "Formative ใช้ตัดเกรดปลายภาคเท่านั้น"
+                        ],
+                        correct: 0,
+                        explanation: "Formative Assessment เป็นการประเมินระหว่างทางเพื่อปรับปรุงการเรียนการสอน ส่วน Summative Assessment ใช้สรุปผลเมื่อจบช่วงการเรียนรู้"
+                    },
+                    {
+                        prompt: "Rubric (เกณฑ์การให้คะแนน) มีไว้เพื่ออะไร?",
+                        options: [
+                            "กำหนดเกณฑ์การให้คะแนนที่ชัดเจนและโปร่งใส",
+                            "เป็นเพียงเอกสารประกอบที่ไม่จำเป็นต้องใช้จริง",
+                            "ใช้แทนใบลงทะเบียนเรียน",
+                            "ใช้บันทึกเวลาเข้าเรียนเท่านั้น"
+                        ],
+                        correct: 0,
+                        explanation: "Rubric ช่วยกำหนดเกณฑ์การให้คะแนนที่ชัดเจน โปร่งใส และช่วยให้ผู้เรียนเข้าใจความคาดหวังของงานที่ได้รับมอบหมาย"
+                    },
+                    {
+                        prompt: "Learning Analytics คืออะไร?",
+                        options: [
+                            "การวิเคราะห์ข้อมูลพฤติกรรมการเรียนเพื่อทำความเข้าใจและพัฒนาการเรียนรู้",
+                            "ซอฟต์แวร์สำหรับตัดต่อวิดีโอการสอน",
+                            "การให้คะแนนด้วยมือทั้งหมด",
+                            "ระบบจองห้องเรียนออนไลน์"
+                        ],
+                        correct: 0,
+                        explanation: "Learning Analytics คือการเก็บและวิเคราะห์ข้อมูลพฤติกรรมการเรียนของผู้เรียน เพื่อนำไปใช้พัฒนาการเรียนการสอนให้ดีขึ้น"
+                    },
+                    {
+                        prompt: "ข้อดีหลักของการใช้แบบทดสอบออนไลน์แบบ Auto-grading คืออะไร?",
+                        options: [
+                            "ให้ผลป้อนกลับ (feedback) แก่ผู้เรียนได้ทันทีหลังทำเสร็จ",
+                            "ต้องรอผลตรวจนานกว่าการตรวจด้วยมือเสมอ",
+                            "ใช้ได้เฉพาะข้อสอบอัตนัยเท่านั้น",
+                            "ไม่สามารถเก็บสถิติคะแนนย้อนหลังได้"
+                        ],
+                        correct: 0,
+                        explanation: "ระบบ Auto-grading ช่วยให้ผู้เรียนได้รับผลป้อนกลับ (feedback) ทันทีหลังทำแบบทดสอบเสร็จ ซึ่งช่วยให้ปรับปรุงการเรียนรู้ได้เร็วขึ้น"
+                    }
+                ],
+                foundation: {
+                    concept: "ความแตกต่างระหว่างการประเมินระหว่างเรียนกับปลายภาค",
+                    drills: [
+                        {
+                            prompt: "การประเมินที่ทำ 'ระหว่าง' การเรียนการสอนเพื่อนำผลไปปรับปรุงทันที เรียกว่าอะไร?",
+                            options: ["Formative Assessment", "รอสอบปลายภาคอย่างเดียว", "การจดชื่อเข้าเรียน", "การจ่ายค่าเทอม"],
+                            correct: 0,
+                            explanation: "Formative Assessment คือการประเมินระหว่างทางเพื่อนำผลไปปรับปรุงการเรียนการสอนทันที ต่างจาก Summative ที่ใช้สรุปผลปลายภาค"
+                        },
+                        {
+                            prompt: "การให้คะแนนแบบมีเกณฑ์ชัดเจนกำหนดไว้ล่วงหน้า เรียกว่าอะไร?",
+                            options: ["Rubric", "Syllabus", "ตารางสอน", "Transcript"],
+                            correct: 0,
+                            explanation: "Rubric คือเกณฑ์การให้คะแนนที่กำหนดไว้ล่วงหน้าอย่างชัดเจนและโปร่งใส"
+                        }
+                    ]
+                }
+            }
+        ];
+
+        let quizState = { studentId: null, chapterId: null, qIndex: 0, score: 0, answered: false, wrongStreak: 0, times: [], startTime: null, adaptiveActive: false, mode: 'main', remedialIndex: 0, pendingRemedial: false };
+        let currentQuizStudentId = null;
+
+        function loadQuizScores() {
+            try {
+                return JSON.parse(localStorage.getItem("quizBestScores") || "{}");
+            } catch (e) {
+                return {};
+            }
+        }
+        function saveQuizScores() {
+            try {
+                localStorage.setItem("quizBestScores", JSON.stringify(quizBestScores));
+            } catch (e) { /* storage unavailable — quietly continue without persistence */ }
+        }
+        // Structure: { [studentId]: { [chapterId]: bestScore } }
+        let quizBestScores = loadQuizScores();
+
+        /** Populate the "ทำแบบทดสอบในฐานะ" student dropdown, restoring the last-used student if possible */
+        function populateQuizStudentSelect() {
+            const select = document.getElementById("quizStudentSelect");
+            if (!select) return;
+            const sorted = [...rawStudentsData].sort((a, b) => a.name.localeCompare(b.name, "th"));
+            select.innerHTML = sorted.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+
+            let lastId = null;
+            try { lastId = localStorage.getItem("lastQuizStudentId"); } catch (e) { /* ignore */ }
+            const validIds = rawStudentsData.map(s => s.id);
+            currentQuizStudentId = (lastId && validIds.includes(lastId)) ? lastId : rawStudentsData[0].id;
+            select.value = currentQuizStudentId;
+        }
+
+        function onQuizStudentChange() {
+            const select = document.getElementById("quizStudentSelect");
+            currentQuizStudentId = select.value;
+            try { localStorage.setItem("lastQuizStudentId", currentQuizStudentId); } catch (e) { /* ignore */ }
+            renderQuizChapterCards();
+            renderStudentPersonalPanel();
+        }
+
+        /**
+         * Switch between the Teacher view (full class analytics) and the Student view
+         * (personal adaptive quiz experience only). Pure CSS toggle via a body class,
+         * so no data is re-fetched — just which sections are shown.
+         */
+        function setRole(role, silent) {
+            document.body.classList.remove("role-teacher", "role-student");
+            document.body.classList.add("role-" + role);
+            const teacherBtn = document.getElementById("roleTeacherBtn");
+            const studentBtn = document.getElementById("roleStudentBtn");
+            if (teacherBtn) teacherBtn.classList.toggle("active", role === "teacher");
+            if (studentBtn) studentBtn.classList.toggle("active", role === "student");
+            try { localStorage.setItem("userRole", role); } catch (e) { /* ignore */ }
+            if (role === "student") renderStudentPersonalPanel();
+            // The scatter plot's SVG has zero size while its section is display:none,
+            // so re-measure it whenever the teacher view becomes visible again
+            if (role === "teacher" && typeof renderScatterPlot === "function") {
+                setTimeout(renderScatterPlot, 0);
+            }
+            if (!silent) showToast(role === "teacher" ? "สลับเป็นมุมมองอาจารย์" : "สลับเป็นมุมมองนักศึกษา");
+        }
+
+        /**
+         * Adaptive recommendation panel shown only in the student view: looks at the
+         * signed-in student's own quiz history and points them at whichever chapter
+         * needs the most review, or celebrates a clean sweep.
+         */
+        function renderStudentPersonalPanel() {
+            const panel = document.getElementById("studentPersonalPanel");
+            if (!panel || !currentQuizStudentId) return;
+            const record = quizBestScores[currentQuizStudentId] || {};
+            const attempted = quizChapters.filter(ch => record[ch.id] !== undefined);
+
+            if (attempted.length === 0) {
+                panel.innerHTML = `
+                    <p class="font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> ยินดีต้อนรับ!
+                    </p>
+                    <p class="text-slate-600 dark:text-slate-300">ยังไม่มีประวัติการทำแบบทดสอบ — เริ่มจาก <span class="font-semibold">${quizChapters[0].title}</span> ได้เลย ระบบจะติดตามความเข้าใจและปรับความช่วยเหลือให้อัตโนมัติระหว่างทาง</p>`;
+                return;
+            }
+
+            let weakest = null, weakestPct = 101;
+            let sumPct = 0;
+            attempted.forEach(ch => {
+                const pct = Math.round((record[ch.id] / ch.questions.length) * 100);
+                sumPct += pct;
+                if (pct < weakestPct) { weakestPct = pct; weakest = ch; }
+            });
+            const avgPct = Math.round(sumPct / attempted.length);
+            const allDone = attempted.length === quizChapters.length;
+
+            if (weakestPct < 70) {
+                panel.innerHTML = `
+                    <p class="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> ระบบแนะนำสำหรับคุณ
+                    </p>
+                    <p class="text-slate-600 dark:text-slate-300">คะแนนเฉลี่ย ${avgPct}% • ยังทำแบบทดสอบไปแล้ว ${attempted.length}/${quizChapters.length} บท</p>
+                    <p class="text-slate-600 dark:text-slate-300">คะแนนใน <span class="font-semibold">${weakest.title}</span> (${weakestPct}%) ยังต่ำกว่าเกณฑ์ ระบบแนะนำให้ทบทวนบทนี้เพิ่มเติมก่อนไปบทถัดไป — ระหว่างทำแบบทดสอบ ระบบจะช่วยลดระดับความยากให้อัตโนมัติหากตอบผิดติดต่อกัน</p>`;
+            } else if (allDone) {
+                panel.innerHTML = `
+                    <p class="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-star"></i> เก่งมาก!
+                    </p>
+                    <p class="text-slate-600 dark:text-slate-300">ทำครบทุกบทแล้ว คะแนนเฉลี่ย ${avgPct}% ลองทำซ้ำบทที่ยังไม่มั่นใจเพื่อรักษาความเข้าใจให้แม่นยำต่อไป</p>`;
+            } else {
+                panel.innerHTML = `
+                    <p class="font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> ไปได้สวย
+                    </p>
+                    <p class="text-slate-600 dark:text-slate-300">คะแนนเฉลี่ย ${avgPct}% จากที่ทำไปแล้ว ${attempted.length}/${quizChapters.length} บท — ลองทำบทที่เหลือต่อได้เลย</p>`;
+            }
+        }
+
+        /** Class-wide participation summary: how many students have tried at least one quiz, and the class average */
+        function renderQuizClassSummary() {
+            const container = document.getElementById("quizClassSummary");
+            if (!container) return;
+            const quizData = computeQuizFeatureData();
+            const pct = Math.round((quizData.attemptedCount / rawStudentsData.length) * 100);
+            container.innerHTML = `
+                <div class="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
+                    <p class="text-slate-500 dark:text-slate-400">ทำแบบทดสอบแล้ว</p>
+                    <p class="text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5">${quizData.attemptedCount} / ${rawStudentsData.length} คน (${pct}%)</p>
+                </div>
+                <div class="bg-slate-50 dark:bg-slate-700/40 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
+                    <p class="text-slate-500 dark:text-slate-400">คะแนนเฉลี่ยของคนที่ทำแล้ว</p>
+                    <p class="text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5">${quizData.attemptedCount ? quizData.classMean + '%' : '--'}</p>
+                </div>
+                <div class="bg-amber-50 dark:bg-amber-950/30 rounded-xl p-3 border border-amber-100 dark:border-amber-900/50 text-amber-700 dark:text-amber-400">
+                    <p class="font-medium"><i class="fa-solid fa-circle-info mr-1"></i>ผลนี้เป็นตัวแปรหนึ่งในโมเดล K-Means / Logistic Regression</p>
+                </div>`;
+        }
+
+        /** Render the grid of chapter cards with the currently-selected student's best recorded score */
+        function renderQuizChapterCards() {
+            const container = document.getElementById("quizChapterGrid");
+            if (!container) return;
+            const studentRecord = quizBestScores[currentQuizStudentId] || {};
+            container.innerHTML = quizChapters.map(ch => {
+                const best = studentRecord[ch.id];
+                const bestText = best !== undefined
+                    ? `<i class="fa-solid fa-star text-amber-400 mr-1"></i>คะแนนดีที่สุด: ${best}/${ch.questions.length}`
+                    : `<i class="fa-regular fa-circle mr-1"></i>ยังไม่เคยทำแบบทดสอบ`;
+                return `
+                <div class="lift-card cursor-pointer bg-slate-50 dark:bg-slate-700/40 rounded-2xl border border-slate-200/80 dark:border-slate-600/60 p-5" onclick="openQuiz(${ch.id})">
+                    <div class="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg mb-3 shadow-sm" style="background-color:${ch.color}">
+                        <i class="fa-solid ${ch.icon}"></i>
+                    </div>
+                    <h4 class="font-bold text-sm text-slate-800 dark:text-slate-100 leading-snug">${ch.title}</h4>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${ch.questions.length} ข้อ • แบบปรนัย</p>
+                    <p class="text-xs font-medium mt-2 ${best !== undefined ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}">${bestText}</p>
+                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-sky-600 dark:text-sky-400 mt-3">
+                        เริ่มทบทวน <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </span>
+                </div>`;
+            }).join("");
+        }
+
+        function openQuiz(chapterId) {
+            if (!currentQuizStudentId) return;
+            quizState = { studentId: currentQuizStudentId, chapterId, qIndex: 0, score: 0, answered: false, wrongStreak: 0, times: [], startTime: null, adaptiveActive: false, mode: 'main', remedialIndex: 0, pendingRemedial: false };
+            const modal = document.getElementById("quizModal");
+            const card = document.getElementById("quizModalCard");
+            modal.classList.remove("hidden");
+            setTimeout(() => {
+                card.classList.remove("scale-95", "opacity-0");
+                card.classList.add("scale-100", "opacity-100");
+            }, 10);
+            document.getElementById("quizResultView").classList.add("hidden");
+            document.getElementById("quizQuestionView").classList.remove("hidden");
+            document.getElementById("quizRetryBtn").classList.add("hidden");
+            document.getElementById("quizNextBtn").classList.remove("hidden");
+            renderQuizQuestion();
+        }
+
+        /** Jump from a student's profile modal straight into their quiz picker, pre-selected */
+        function goToStudentQuiz() {
+            const studentId = window.currentModalStudentId;
+            if (!studentId) return;
+            closeStudentModal();
+            currentQuizStudentId = studentId;
+            const select = document.getElementById("quizStudentSelect");
+            if (select) select.value = studentId;
+            try { localStorage.setItem("lastQuizStudentId", studentId); } catch (e) { /* ignore */ }
+            renderQuizChapterCards();
+            setTimeout(() => {
+                document.getElementById("section-quiz").scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 250);
+        }
+
+        function currentQuizChapter() {
+            return quizChapters.find(c => c.id === quizState.chapterId);
+        }
+
+        function renderQuizQuestion() {
+            const ch = currentQuizChapter();
+
+            if (quizState.mode === 'remedial') { return renderRemedialQuestion(ch); }
+            if (quizState.qIndex >= ch.questions.length) { return renderQuizResult(ch); }
+
+            const q = ch.questions[quizState.qIndex];
+            document.getElementById("quizChapterTitle").innerText = ch.title;
+            document.getElementById("quizProgressText").innerText = `ข้อ ${quizState.qIndex + 1} / ${ch.questions.length}`;
+            document.getElementById("quizProgressBar").style.width = `${(quizState.qIndex / ch.questions.length) * 100}%`;
+            document.getElementById("quizQuestionText").innerText = q.prompt;
+
+            // Adaptive difficulty: once the learner is flagged as struggling on this
+            // attempt, automatically eliminate one wrong option on later questions so
+            // there's less to weigh while they rebuild understanding
+            const eliminatedIdx = quizState.adaptiveActive ? q.options.findIndex((_, i) => i !== q.correct) : -1;
+
+            const optWrap = document.getElementById("quizOptionsWrap");
+            optWrap.innerHTML = q.options.map((opt, i) => {
+                const isEliminated = i === eliminatedIdx;
+                return `
+                <button onclick="${isEliminated ? '' : `selectQuizAnswer(${i})`}" ${isEliminated ? 'disabled' : ''} data-idx="${i}" class="quiz-option w-full text-left px-4 py-3 rounded-xl border text-sm transition ${isEliminated ? 'border-slate-200 dark:border-slate-700 opacity-40 line-through cursor-not-allowed text-slate-400 dark:text-slate-500' : 'border-slate-200 dark:border-slate-600 hover:border-sky-400 dark:hover:border-sky-500 text-slate-700 dark:text-slate-200'}">
+                    <span class="font-semibold mr-2">${String.fromCharCode(65 + i)}.</span>${opt}${isEliminated ? ' <span class="text-[10px]">(ระบบตัดออกให้)</span>' : ''}
+                </button>`;
+            }).join("");
+
+            document.getElementById("quizFeedback").classList.add("hidden");
+            document.getElementById("quizAdaptiveNotice").classList.add("hidden");
+            const nextBtn = document.getElementById("quizNextBtn");
+            nextBtn.disabled = true;
+            nextBtn.classList.add("opacity-50", "cursor-not-allowed");
+            nextBtn.innerHTML = 'ถัดไป <i class="fa-solid fa-arrow-right"></i>';
+            quizState.answered = false;
+            quizState.startTime = Date.now();
+            renderQuizLiveStats();
+        }
+
+        /**
+         * Foundational remediation gate: a short 2-question drill on the core concept
+         * behind the current chapter. Triggered automatically when the ML-style signal
+         * (two wrong answers in a row) predicts a foundational gap, so the learner
+         * "plugs the leak" immediately instead of continuing to struggle on the topic.
+         */
+        function renderRemedialQuestion(ch) {
+            const drills = ch.foundation.drills;
+
+            if (quizState.remedialIndex >= drills.length) {
+                // Remedial drill cleared — resume the main quiz right after the question
+                // that triggered it, keeping the reduced-difficulty mode active
+                quizState.mode = 'main';
+                quizState.wrongStreak = 0;
+                quizState.qIndex++;
+                showToast(`ฝึกพื้นฐานเรื่อง "${ch.foundation.concept}" ครบแล้ว กลับไปทำแบบทดสอบต่อ`);
+                return renderQuizQuestion();
+            }
+
+            const d = drills[quizState.remedialIndex];
+            document.getElementById("quizChapterTitle").innerText = `ฝึกพื้นฐาน: ${ch.foundation.concept}`;
+            document.getElementById("quizProgressText").innerText = `พื้นฐานข้อ ${quizState.remedialIndex + 1} / ${drills.length}`;
+            document.getElementById("quizProgressBar").style.width = `${(quizState.remedialIndex / drills.length) * 100}%`;
+            document.getElementById("quizQuestionText").innerText = d.prompt;
+
+            const optWrap = document.getElementById("quizOptionsWrap");
+            optWrap.innerHTML = d.options.map((opt, i) => `
+                <button onclick="selectRemedialAnswer(${i})" data-idx="${i}" class="quiz-option w-full text-left px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-800/70 hover:border-amber-400 dark:hover:border-amber-500 transition text-sm text-slate-700 dark:text-slate-200">
+                    <span class="font-semibold mr-2">${String.fromCharCode(65 + i)}.</span>${opt}
+                </button>`).join("");
+
+            document.getElementById("quizFeedback").classList.add("hidden");
+            document.getElementById("quizLiveStats").innerHTML = "";
+
+            const notice = document.getElementById("quizAdaptiveNotice");
+            notice.classList.remove("hidden");
+            document.getElementById("quizAdaptiveNoticeText").innerText = (quizState.remedialIndex === 0)
+                ? `ระบบวิเคราะห์รูปแบบการตอบแล้วคาดว่าคุณอาจยังขาดพื้นฐานเรื่อง "${ch.foundation.concept}" จึงขอพาไปฝึกโจทย์พื้นฐานสั้นๆ ${drills.length} ข้อก่อน เพื่ออุดช่องว่างความเข้าใจทันที แล้วจะพากลับไปทำแบบทดสอบเดิมต่อให้`
+                : `ข้อถัดไปของการฝึกพื้นฐานเรื่อง "${ch.foundation.concept}"`;
+
+            const nextBtn = document.getElementById("quizNextBtn");
+            nextBtn.disabled = true;
+            nextBtn.classList.add("opacity-50", "cursor-not-allowed");
+            nextBtn.innerHTML = 'ข้อถัดไป <i class="fa-solid fa-arrow-right"></i>';
+            quizState.answered = false;
+        }
+
+        function selectRemedialAnswer(idx) {
+            if (quizState.answered) return;
+            quizState.answered = true;
+
+            const ch = currentQuizChapter();
+            const d = ch.foundation.drills[quizState.remedialIndex];
+            const correct = idx === d.correct;
+
+            document.querySelectorAll('.quiz-option').forEach((btn, i) => {
+                btn.classList.remove('hover:border-amber-400', 'dark:hover:border-amber-500');
+                btn.disabled = true;
+                if (i === d.correct) {
+                    btn.classList.add('border-emerald-500', 'bg-emerald-50', 'dark:bg-emerald-950/30');
+                } else if (i === idx) {
+                    btn.classList.add('border-rose-500', 'bg-rose-50', 'dark:bg-rose-950/30');
+                }
+            });
+
+            const feedback = document.getElementById("quizFeedback");
+            feedback.classList.remove("hidden");
+            feedback.innerHTML = `<span class="font-semibold ${correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">${correct ? 'ถูกต้อง!' : 'ยังไม่ถูกต้อง'}</span> — ${d.explanation}`;
+
+            const nextBtn = document.getElementById("quizNextBtn");
+            nextBtn.disabled = false;
+            nextBtn.classList.remove("opacity-50", "cursor-not-allowed");
+            if (quizState.remedialIndex === ch.foundation.drills.length - 1) {
+                nextBtn.innerHTML = 'กลับไปทำแบบทดสอบต่อ <i class="fa-solid fa-arrow-rotate-left"></i>';
+            }
+        }
+
+        /** Live, per-question feedback shown while the quiz is in progress: running
+         *  accuracy, average answer time, and a plain-language understanding level. */
+        function renderQuizLiveStats() {
+            const el = document.getElementById("quizLiveStats");
+            if (!el) return;
+            const answered = quizState.times.length;
+            if (!answered) { el.innerHTML = ""; return; }
+            const avgTime = (quizState.times.reduce((a, b) => a + b, 0) / answered).toFixed(1);
+            const acc = Math.round((quizState.score / answered) * 100);
+            let level, levelColor;
+            if (acc >= 80) { level = "ดีเยี่ยม"; levelColor = "text-emerald-600 dark:text-emerald-400"; }
+            else if (acc >= 50) { level = "ปานกลาง"; levelColor = "text-amber-600 dark:text-amber-400"; }
+            else { level = "ควรทบทวนเพิ่มเติม"; levelColor = "text-rose-600 dark:text-rose-400"; }
+            el.innerHTML = `
+                <span><i class="fa-solid fa-bullseye mr-1"></i>ถูก ${quizState.score}/${answered}</span>
+                <span class="mx-1">•</span>
+                <span><i class="fa-regular fa-clock mr-1"></i>เฉลี่ย ${avgTime} วิ/ข้อ</span>
+                <span class="mx-1">•</span>
+                <span class="${levelColor} font-semibold"><i class="fa-solid fa-gauge mr-1"></i>ระดับความเข้าใจ: ${level}</span>`;
+        }
+
+        function selectQuizAnswer(idx) {
+            if (quizState.answered) return;
+            quizState.answered = true;
+
+            const ch = currentQuizChapter();
+            const q = ch.questions[quizState.qIndex];
+            const correct = idx === q.correct;
+            if (correct) quizState.score++;
+
+            // Track speed and correctness for this question — the two signals the
+            // adaptive engine uses to decide whether the learner is struggling
+            const elapsedSec = quizState.startTime ? (Date.now() - quizState.startTime) / 1000 : 0;
+            quizState.times.push(elapsedSec);
+            quizState.wrongStreak = correct ? 0 : quizState.wrongStreak + 1;
+
+            document.querySelectorAll('.quiz-option').forEach((btn, i) => {
+                btn.classList.remove('hover:border-sky-400', 'dark:hover:border-sky-500');
+                btn.disabled = true;
+                if (i === q.correct) {
+                    btn.classList.add('border-emerald-500', 'bg-emerald-50', 'dark:bg-emerald-950/30');
+                } else if (i === idx) {
+                    btn.classList.add('border-rose-500', 'bg-rose-50', 'dark:bg-rose-950/30');
+                }
+            });
+
+            const feedback = document.getElementById("quizFeedback");
+            feedback.classList.remove("hidden");
+            feedback.innerHTML = `<span class="font-semibold ${correct ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}">${correct ? 'ถูกต้อง!' : 'ยังไม่ถูกต้อง'}</span> — ${q.explanation}`;
+
+            renderQuizLiveStats();
+
+            const nextBtn = document.getElementById("quizNextBtn");
+            nextBtn.disabled = false;
+            nextBtn.classList.remove("opacity-50", "cursor-not-allowed");
+
+            // ML-style prediction: two wrong answers in a row on this attempt means the
+            // learner likely has a foundational gap in this chapter's core concept —
+            // route them through a short remedial drill before letting them continue,
+            // rather than just marching on to the next question
+            if (quizState.wrongStreak === 2 && ch.foundation) {
+                quizState.adaptiveActive = true;
+                quizState.pendingRemedial = true;
+                nextBtn.innerHTML = 'ไปฝึกพื้นฐานก่อน <i class="fa-solid fa-arrow-right"></i>';
+            } else if (quizState.qIndex === ch.questions.length - 1) {
+                nextBtn.innerHTML = 'ดูผลคะแนน <i class="fa-solid fa-flag-checkered"></i>';
+            }
+        }
+
+        function nextQuizQuestion() {
+            if (quizState.mode === 'remedial') {
+                quizState.remedialIndex++;
+                renderQuizQuestion();
+                return;
+            }
+            if (quizState.pendingRemedial) {
+                quizState.pendingRemedial = false;
+                quizState.mode = 'remedial';
+                quizState.remedialIndex = 0;
+                renderQuizQuestion();
+                return;
+            }
+            quizState.qIndex++;
+            renderQuizQuestion();
+        }
+
+        /**
+         * Quiz finished: save the best score for this student+chapter, then RETRAIN the
+         * ML pipeline (K-Means + Logistic Regression) since quiz performance is one of
+         * their input features, and refresh every view that depends on it.
+         */
+        function renderQuizResult(ch) {
+            document.getElementById("quizQuestionView").classList.add("hidden");
+            document.getElementById("quizProgressBar").style.width = "100%";
+            document.getElementById("quizProgressText").innerText = "เสร็จสิ้น";
+            document.getElementById("quizResultView").classList.remove("hidden");
+            document.getElementById("quizNextBtn").classList.add("hidden");
+            document.getElementById("quizRetryBtn").classList.remove("hidden");
+            document.getElementById("quizRetryBtn").classList.add("inline-flex");
+
+            const pct = Math.round((quizState.score / ch.questions.length) * 100);
+            const studentId = quizState.studentId;
+            if (!quizBestScores[studentId]) quizBestScores[studentId] = {};
+            const prevBest = quizBestScores[studentId][ch.id];
+            const improved = prevBest === undefined || quizState.score > prevBest;
+            if (improved) {
+                quizBestScores[studentId][ch.id] = quizState.score;
+                saveQuizScores();
+            }
+
+            document.getElementById("quizResultScore").innerText = `${quizState.score} / ${ch.questions.length}`;
+            document.getElementById("quizResultPct").innerText = `${pct}%`;
+            let resultMsg =
+                pct >= 80 ? "ยอดเยี่ยมมาก! เข้าใจเนื้อหาบทนี้เป็นอย่างดี" :
+                pct >= 50 ? "พอใช้ได้ ลองทบทวนอีกครั้งเพื่อความแม่นยำที่มากขึ้น" :
+                "ควรกลับไปทบทวนเนื้อหาบทนี้เพิ่มเติมก่อนสอบจริง";
+            if (quizState.adaptiveActive) {
+                resultMsg += " • ระบบได้ช่วยลดระดับความยากและแนะนำให้ทบทวนเนื้อหาพื้นฐานระหว่างทำแบบทดสอบนี้ให้แล้ว";
+            }
+            document.getElementById("quizResultMsg").innerText = resultMsg;
+
+            renderStudentPersonalPanel();
+
+            if (improved) {
+                // A new best score changes this student's quiz-average feature — retrain & refresh the ML views
+                trainRiskModel();
+                runKMeansClustering();
+                renderScatterPlot();
+                renderClusterCards();
+                renderPredictionTable();
+                updateStatCards();
+                renderQuizClassSummary();
+            }
+        }
+
+        function retryQuiz() {
+            quizState.qIndex = 0;
+            quizState.score = 0;
+            quizState.wrongStreak = 0;
+            quizState.times = [];
+            quizState.adaptiveActive = false;
+            quizState.mode = 'main';
+            quizState.remedialIndex = 0;
+            quizState.pendingRemedial = false;
+            document.getElementById("quizResultView").classList.add("hidden");
+            document.getElementById("quizQuestionView").classList.remove("hidden");
+            document.getElementById("quizRetryBtn").classList.add("hidden");
+            document.getElementById("quizNextBtn").classList.remove("hidden");
+            document.getElementById("quizNextBtn").innerHTML = 'ถัดไป <i class="fa-solid fa-arrow-right"></i>';
+            renderQuizQuestion();
+        }
+
+        function closeQuizModal() {
+            const modal = document.getElementById("quizModal");
+            const card = document.getElementById("quizModalCard");
+            card.classList.remove("scale-100", "opacity-100");
+            card.classList.add("scale-95", "opacity-0");
+            setTimeout(() => modal.classList.add("hidden"), 200);
+            renderQuizChapterCards(); // refresh best-score badges after closing
+        }
+
+        // Initial Load Event Listener
+        window.onload = function () {
+            // Restore last-used view (teacher / student) before anything else renders
+            let savedRole = "teacher";
+            try { savedRole = localStorage.getItem("userRole") || "teacher"; } catch (e) { /* ignore */ }
+            setRole(savedRole, true);
+
+            // Train the Logistic Regression risk model on this class's own data first...
+            // (this now also folds in each student's quiz-review performance as a feature)
+            trainRiskModel();
+            // ...then run K-Means Clustering (which also calls computePrediction per student)
+            runKMeansClustering();
+
+            // Render Scatter Plot and Cards
+            renderScatterPlot();
+            renderClusterCards();
+            renderPredictionTable();
+            updateStatCards();
+            populateQuizStudentSelect();
+            renderQuizChapterCards();
+            renderQuizClassSummary();
+            renderStudentPersonalPanel();
+
+            // Window Resize Listener for Responsive SVG Plot
+            window.addEventListener('resize', () => {
+                renderScatterPlot();
+            });
+        };
+    </script>
+</body>
+</html>
